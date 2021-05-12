@@ -11,6 +11,7 @@
 #include <queue>
 #include <limits>
 #include <iostream>
+#include <algorithm>
 #include "MutablePriorityQueue.h"
 
 using namespace std;
@@ -32,9 +33,11 @@ class Vertex {
 	T info;
 	vector<Edge<T> *> outgoing;
 	vector<Edge<T> *> incoming;
+    vector<Edge<T> *> adj;
 
 	bool visited;  // for path finding
-	Edge<T> *path; // for path finding
+	//Edge<T> *path; // for path finding
+    Vertex<T> *path = NULL;
 	double dist;   // for path finding
 	int queueIndex = 0; // required by MutablePriorityQueue
 
@@ -44,6 +47,7 @@ class Vertex {
 
 public:
 	T getInfo() const;
+	double getDist() {return dist;}
 	vector<Edge<T> *> getIncoming() const;
 	vector<Edge<T> *> getOutgoing() const;
 	friend class Graph<T>;
@@ -56,6 +60,7 @@ Vertex<T>::Vertex(T in): info(in) {}
 
 template <class T>
 void Vertex<T>::addEdge(Edge<T> *e) {
+    adj.push_back(e);
 	outgoing.push_back(e);
 	e->dest->incoming.push_back(e);
 }
@@ -90,6 +95,7 @@ template <class T>
 class Edge {
 	Vertex<T> * orig;
 	Vertex<T> * dest;
+    vector<T> complex_path;
 	double capacity;
 	double cost;
 	double flow;
@@ -97,10 +103,21 @@ class Edge {
 	Edge(Vertex<T> *o, Vertex<T> *d, double capacity, double cost=0, double flow=0);
 
 public:
+    Edge(Vertex<T> *o, Vertex<T> *d, double cost, vector<T> complex_path);
 	friend class Graph<T>;
 	friend class Vertex<T>;
 	double getFlow() const;
+    vector<Edge<T> *> getComplexPath();
+    void setComplexPath(vector<Edge<T> *> complex_path);
+    Vertex<T> * getOrigin() {return orig;}
+    Vertex<T> * getDest() {return dest;}
+    double getCost() const {return cost;}
 };
+
+template <class T>
+Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, double cost, vector<T> complex_path): orig(o), dest(d), cost(cost){
+    this->complex_path = complex_path;
+}
 
 template <class T>
 Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, double capacity, double cost, double flow):
@@ -111,6 +128,15 @@ double  Edge<T>::getFlow() const {
 	return this->flow;
 }
 
+template <class T>
+vector<Edge<T> *>  Edge<T>::getComplexPath(){
+    return this->complex_path;
+}
+
+template <class T>
+void  Edge<T>::setComplexPath(vector<Edge<T> *> complex_path){
+    this->complex_path = complex_path;
+}
 
 /* ================================================================================================
  * Class Graph
@@ -121,7 +147,7 @@ template <class T>
 class Graph {
 	vector<Vertex<T> *> vertexSet;
 
-	void dijkstraShortestPath(Vertex<T> *s);
+    void dijkstraResidualShortestPath(Vertex<T> *s);
 	void bellmanFordShortestPath(Vertex<T> *s);
 	bool relax(Vertex<T> *v, Vertex<T> *w, Edge<T> *e, double residual, double cost);
 
@@ -132,13 +158,17 @@ class Graph {
 	void augmentFlowAlongPath(Vertex<T> *s, Vertex<T> *t, double flow);
 
 public:
+    void dijkstraShortestPath(const T &origin);
 	Vertex<T>* findVertex(const T &inf) const;
 	vector<Vertex<T> *> getVertexSet() const;
 	Vertex<T> *addVertex(const T &in);
 	Edge<T> *addEdge(const T &sourc, const T &dest, double capacity, double cost, double flow=0);
+    Edge<T> *addEdge(const T &sourc, const T &dest, double cost, vector<T> complex_path);
 	double getFlow(const T &sourc, const T &dest) const ;
 	void fordFulkerson(T source, T target);
 	double minCostFlow(T source, T target, double flow);
+    vector<T> getPath(const T &origin, const T &dest) const;
+
 };
 
 template <class T>
@@ -160,6 +190,17 @@ Edge<T> * Graph<T>::addEdge(const T &sourc, const T &dest, double capacity, doub
 	Edge<T> *e = new Edge<T>(s, d, capacity, cost, flow);
 	s->addEdge(e);
 	return e;
+}
+
+template <class T>
+Edge<T> * Graph<T>::addEdge(const T &sourc, const T &dest, double cost, vector<T> complex_path) {
+    auto s = findVertex(sourc);
+    auto d = findVertex(dest);
+    if (s == nullptr || d == nullptr)
+        return nullptr;
+    Edge<T> *e = new Edge<T>(s, d, cost, complex_path);
+    s->addEdge(e);
+    return e;
 }
 
 template <class T>
@@ -185,6 +226,82 @@ double Graph<T>::getFlow(const T &sourc, const T &dest) const {
 template <class T>
 vector<Vertex<T> *> Graph<T>::getVertexSet() const {
 	return vertexSet;
+}
+
+/**************** Shortest Path Problem  ************/
+
+template<class T>
+void Graph<T>::dijkstraShortestPath(const T &origin) {
+    for (Vertex<T>* vertex : vertexSet) {
+        vertex->dist = INF;
+        vertex->path = NULL;
+        vertex->queueIndex = 0;
+    }
+
+    MutablePriorityQueue<Vertex<T>> vertexQueue;
+    findVertex(origin)->dist = 0;
+    vertexQueue.insert(findVertex(origin));
+
+    while(!vertexQueue.empty()) {
+        Vertex<T>* v = vertexQueue.extractMin();
+        for (Edge<T>* edge : v->adj) {
+            double oldDist = edge->getDest()->dist;
+            if (edge->getDest()->dist > v->dist + edge->getCost()) {
+                edge->getDest()->dist = v->dist + edge->getCost();
+                edge->getDest()->path = v;
+                if (oldDist == INF)
+                    vertexQueue.insert(edge->dest);
+                else
+                    vertexQueue.decreaseKey(edge->dest);
+            }
+        }
+    }
+}
+
+template<class T>
+std::vector<T> Graph<T>::getPath(const T &origin, const T &dest) const{
+    std::vector<T> res;
+
+    Vertex<T>* v = this->findVertex(dest);
+    if (v == nullptr || v->dist == INF) return res;
+
+    while(true) {
+        res.push_back(v->info);
+        if (v->info == origin) break;
+        v = v->path;
+    }
+
+    std::reverse(res.begin(), res.end());
+
+    return res;
+}
+
+template <class T>
+Graph<T> dijkstraInterestPoints(Graph<T> complete_graph, vector<T> important_points){
+    Graph<T> result;
+    for(int i = 0; i < important_points.size(); i++){
+        result.addVertex(important_points[i]);
+    }
+    for(int i = 0; i < important_points.size(); i++){
+        T current_info = important_points[i];
+        //Graph<T> copy = complete_graph;
+        complete_graph.dijkstraShortestPath(current_info);
+        //copy.dijkstraShortestPath(current_info);
+        cout << endl << "I(" << i << ") -> currentInfo = " << current_info << endl;
+        for(int j = 0; j < important_points.size(); j++){
+            if(important_points[j] != current_info){
+                vector<T> path = complete_graph.getPath(current_info, important_points[j]);
+                double dist = complete_graph.findVertex(j)->getDist();
+                cout << "J(" << j << ") -> Info = " << important_points[j] << endl;
+                cout << "J(" << j << ") -> dist = " << dist << endl;
+                cout << "J(" << j << ") -> path = ";
+                for(int a = 0; a < path.size(); a++) cout << path[a] << ", ";
+                cout << endl;
+                result.addEdge(current_info, important_points[j], dist, path);
+            }
+        }
+    }
+    return result;
 }
 
 /**************** Maximum Flow Problem  ************/
@@ -293,7 +410,7 @@ void Graph<T>::augmentFlowAlongPath(Vertex<T> *s, Vertex<T> *t, double f) {
  * The result is indicated by the field "dist" of each vertex.
  */
 template<class T>
-void Graph<T>::dijkstraShortestPath(Vertex<T> *s ) {
+void Graph<T>::dijkstraResidualShortestPath(Vertex<T> *s ) {
     for(auto v : vertexSet)
         v->dist = INF;
     s->dist = 0;
