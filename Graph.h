@@ -159,6 +159,7 @@ class Graph {
 
 public:
     void dijkstraShortestPath(const T &origin);
+    Graph <T> generateInterestPointsGraph(vector<T> important_points);
 	Vertex<T>* findVertex(const T &inf) const;
 	vector<Vertex<T> *> getVertexSet() const;
 	Vertex<T> *addVertex(const T &in);
@@ -275,6 +276,35 @@ std::vector<T> Graph<T>::getPath(const T &origin, const T &dest) const{
 
     return res;
 }
+
+template <class T>
+Graph<T> Graph<T>::generateInterestPointsGraph(vector<T> important_points){
+    Graph<T> result;
+    for(int i = 0; i < important_points.size(); i++){
+        result.addVertex(important_points[i]);
+    }
+    for(int i = 0; i < important_points.size(); i++){
+        T current_info = important_points[i];
+        //Graph<T> copy = complete_graph;
+        this->dijkstraShortestPath(current_info);
+        //copy.dijkstraShortestPath(current_info);
+        cout << endl << "I(" << i << ") -> currentInfo = " << current_info << endl;
+        for(int j = 0; j < important_points.size(); j++){
+            if(important_points[j] != current_info){
+                vector<T> path = this->getPath(current_info, important_points[j]);
+                double dist = this->findVertex(j)->getDist();
+                cout << "J(" << j << ") -> Info = " << important_points[j] << endl;
+                cout << "J(" << j << ") -> dist = " << dist << endl;
+                cout << "J(" << j << ") -> path = ";
+                for(int a = 0; a < path.size(); a++) cout << path[a] << ", ";
+                cout << endl;
+                result.addEdge(current_info, important_points[j], dist, path);
+            }
+        }
+    }
+    return result;
+}
+
 
 template <class T>
 Graph<T> dijkstraInterestPoints(Graph<T> complete_graph, vector<T> important_points){
