@@ -118,6 +118,8 @@ public:
     void floydWarshallShortestPath();   //TODO...
     std::vector<T> getfloydWarshallPath(const T &origin, const T &dest) const;   //TODO...
 
+    // Project - TSP
+    std::vector<Vertex<T> *> nearestNeighbour(Vertex<T> *origin);
 };
 
 template <class T>
