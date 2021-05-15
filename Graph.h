@@ -229,6 +229,35 @@ vector<Vertex<T> *> Graph<T>::getVertexSet() const {
 	return vertexSet;
 }
 
+/****************** 2a) dfs ********************/
+template <class T>
+std::vector<T> Graph<T>::dfs() const {
+    std::vector<T> res;
+    for(auto v : vertexSet){
+        v->visited = false;
+    }
+    for(auto v : vertexSet){
+        if(!v->visited)
+            this->dfsVisit(v, res);
+    }
+
+    return res;
+}
+
+/*
+ * Auxiliary function that visits a vertex (v) and its adjacent not yet visited, recursively.
+ * Updates a parameter with the list of visited node contents.
+ */
+template <class T>
+void Graph<T>::dfsVisit(Vertex<T> *v, std::vector<T> & res) const {
+    v->visited = true;
+    res.push_back(v->info);
+    for(auto a: v->adj){
+        if(!a.dest->visited)
+            dfsVisit(a.dest, res);
+    }
+}
+
 /**************** Shortest Path Problem  ************/
 
 template<class T>
