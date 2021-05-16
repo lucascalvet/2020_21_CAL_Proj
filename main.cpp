@@ -204,24 +204,35 @@ int main(){
 
     Graph<unsigned> g;
     Graph<unsigned> gg;
+    /*
     cout << "Importing graph..." << endl;
     time_t start_time = time(NULL);
     g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt");
     cout << "Calculating scc..." << endl;
     cout << "STRONG Detected " << g.dfsConnectivity().size() << " scc's" << endl;
+     */
     cout << "Importing graph..." << endl;
     gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
-    cout << "Calculating scc..." << endl;
-    cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
+    //cout << "Calculating scc..." << endl;
+    //cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
     //g.importGraph("../resources/Espinho/espinho_strong_nodes_xy.txt", "../resources/Espinho/espinho_strong_edges.txt");
-    time_t end_time = time(NULL);
+    //time_t end_time = time(NULL);
     //cout << "Finished importing graph in " << end_time - start_time << " s" << endl;
-    //vector<unsigned> ids {53619, 21329, 48150, 26850};
+    vector<unsigned> ids = {4, 6, 7, 8};
     //vector<unsigned> ids {8932, 13373};
-    //cout << "Running Dijkstra..." << endl;
+    cout << "Running Dijkstra..." << endl;
     //Graph<unsigned> minig = g.generateInterestPointsGraph(ids);
+    //Graph<unsigned> minig = gg.generateInterestPointsGraph(ids);
     //GraphPrintInfo(g);
 
     //minig.viewGraph();
-    //g.viewGraphPath(minig);
+
+    /*
+    if(minig.getVertexSet().size() != 0){
+        g.viewGraphPath(minig);
+    }
+     */
+
+    g.viewGraph();
+
 }

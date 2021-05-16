@@ -8,8 +8,10 @@
 #include <algorithm>
 #include <fstream>
 #include <graphviewer.h>
+#include <sstream>
 #include "MutablePriorityQueue.h"
 #include "Utils.h"
+
 
 constexpr auto INF = std::numeric_limits<double>::max();
 
@@ -207,7 +209,11 @@ public:
 
     void dijkstraShortestPath(const T &origin);
 
+    void heldKarp(const T &origin);
+
     std::vector<std::vector<T>> dfsConnectivity() const;
+
+    bool checkConectivity(std::vector<T> ids);
 
     std::vector<T> dfs() const;
 
@@ -331,8 +337,8 @@ std::vector<std::vector<T>> Graph<T>::dfsConnectivity() const {
     Vertex<T> *v;
     std::vector<T> scc;
     std::vector<std::vector<T>> res;
-    for (auto i : visit_order) {
-        v = findVertex(i);
+    for (int i = visit_order.size() - 1; i >= 0; i--) {
+        v = findVertex(visit_order.at(i));
         if (!v->visited) {
             dfsVisit(v, scc, true);
             res.push_back(scc);
@@ -363,11 +369,16 @@ template<class T>
 void Graph<T>::dfsVisit(Vertex<T> *v, std::vector<T> &res, bool reverse) const {
     v->visited = true;
     std::vector<Edge<T> *> edges;
-    if (reverse) edges = v->incoming;
-    else edges = v->outgoing;
-    for (auto e : edges) {
-        if (!e->dest->visited)
-            dfsVisit(e->dest, res, reverse);
+    if (reverse) {
+        for (auto e : v->incoming) {
+            if (!e->orig->visited)
+                dfsVisit(e->orig, res, reverse);
+        }
+    } else {
+        for (auto e : v->outgoing) {
+            if (!e->dest->visited)
+                dfsVisit(e->dest, res, reverse);
+        }
     }
     res.push_back(v->info);
 }
@@ -425,6 +436,13 @@ std::vector<T> Graph<T>::getPath(const T &origin, const T &dest) const {
 template<class T>
 Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) {
     Graph<T> result;
+    std::cout << "Checking Con..." << std::endl;
+    if (!checkConectivity(important_points)) {
+        std::cout << "Conectivity Invalid!!!" << std::endl;
+        return result;
+    }
+    std::cout << "Con Good!" << std::endl;
+
     for (int i = 0; i < important_points.size(); i++) {
         Vertex<T> *v = findVertex(important_points[i]);
         result.addVertex(important_points[i], v->getX(), v->getY());
@@ -449,6 +467,11 @@ Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) 
         }
     }
     return result;
+}
+
+template<class T>
+void Graph<T>::heldKarp(const T &origin) {
+
 }
 
 template<class T>
@@ -521,8 +544,13 @@ void Graph<T>::viewGraph() {
     // Set coordinates of window center
     gv.setCenter(sf::Vector2f(300, 300));
 
+    unsigned vcounter = 1;
+    std::stringstream ss;
     for (auto vertex : getVertexSet()) {
-        gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getX(), vertex->getY()));
+        ss << vcounter;
+        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getX(), vertex->getY()));
+        node.setLabel(ss.str());
+        vcounter++;
     }
 
     unsigned counter = 0;
@@ -583,7 +611,6 @@ void Graph<T>::viewGraphPath(Graph<T> igraph) {
         }
     }
 
-
     for (auto ivertex : igraph.getVertexSet()) {
         for (auto edge : ivertex->getOutgoing()) {
             for (int i = 0; i < (edge->getComplexPath()).size() - 1; i++) {
@@ -601,13 +628,42 @@ void Graph<T>::viewGraphPath(Graph<T> igraph) {
         }
     }
 
-
-
     // Create window
     gv.createWindow(600, 600);
 
     // Join viewer thread (blocks till window closed)
     gv.join();
+}
+
+template<class T>
+bool Graph<T>::checkConectivity(std::vector<T> ids) {
+    if (ids.empty()) return false;
+    if (ids.size() == 1) return true;
+    std::vector<std::vector<T>> sccs = dfsConnectivity();
+    std::vector<T> target_scc;
+    bool found_target = false;
+    for (std::vector<T> scc : sccs) {
+        for (auto id : scc) {
+            if (id == ids.at(0)) {
+                target_scc = scc;
+                found_target = true;
+                break;
+            }
+        }
+        if (found_target) break;
+    }
+    if (target_scc.size() < ids.size()) return false;
+    bool found_id = false;
+    for (int i = 1; i < ids.size(); i++) {
+        for (auto id : target_scc) {
+            if (id == ids.at(i)) {
+                found_id = true;
+                break;
+            }
+        }
+        if (!found_id) return false;
+    }
+    return true;
 }
 
 #endif /* PROJ_GRAPH_H_ */
