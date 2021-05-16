@@ -2,6 +2,8 @@
 #include <string>
 #include "Graph.h"
 #include <math.h>
+#include <ctime>
+
 using namespace std;
 
 void addPair(vector<int> pairs, int n1, int n2){
@@ -36,6 +38,68 @@ void GraphPrintInfo(Graph<T> g) {
 }
 
 /*
+template<class T>
+Graph<T> importGraph(string vertex_filename, string edges_filename) {
+    ifstream vertex_file(vertex_filename);
+    ifstream edge_file(edges_filename);
+    Graph<unsigned> graph;
+    unsigned n_vertex;
+    char sep;
+    unsigned id;
+    double x, y;
+    vertex_file >> n_vertex;
+    for (unsigned i = 0; i < n_vertex; i++) {
+        vertex_file >> sep;
+        vertex_file >> id;
+        vertex_file >> sep;
+        vertex_file >> x;
+        vertex_file >> sep;
+        vertex_file >> y;
+        vertex_file >> sep;
+        graph.addVertex(id, x, y);
+    }
+    unsigned n_edges;
+    unsigned orig, dest;
+    edge_file >> n_edges;
+    for (unsigned i = 0; i < n_edges; i++) {
+        edge_file >> sep;
+        edge_file >> orig;
+        edge_file >> sep;
+        edge_file >> dest;
+        edge_file >> sep;
+        graph.addEdge(orig, dest);
+    }
+    return graph;
+}
+
+void viewGraph(Graph<unsigned> graph) {
+    // Instantiate GraphViewer
+    GraphViewer gv;
+
+    // Set coordinates of window center
+    gv.setCenter(sf::Vector2f(300, 300));
+
+    for (auto vertex : graph.getVertexSet()) {
+        gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getX(), vertex->getY()));
+    }
+
+    unsigned counter = 0;
+    for (auto vertex : graph.getVertexSet()) {
+        for (auto edge : vertex->getOutgoing()) {
+            gv.addEdge(counter, gv.getNode(vertex->getInfo()), gv.getNode(edge->getDest()->getInfo()), GraphViewer::Edge::DIRECTED);
+            counter++;
+        }
+    }
+
+    // Create window
+    gv.createWindow(600, 600);
+
+    // Join viewer thread (blocks till window closed)
+    gv.join();
+}
+ */
+
+/*
 template <class T>
 Graph<T> dijkstraInterestPoints(Graph<T> complete_graph, vector<T> important_points){
     Graph<T> result;
@@ -68,6 +132,7 @@ Graph<T> dijkstraInterestPoints(Graph<T> complete_graph, vector<T> important_poi
 int main(){
     cout << "Start" << endl;
 
+    /*
     Graph <int> G;
     int nv = 50;
     for(int i = 0; i < nv; i++){
@@ -125,6 +190,7 @@ int main(){
     }
      */
 
+    /*
     cout << G.getVertexSet().size() << endl;
 
     cout << "D DAY" << endl;
@@ -134,5 +200,28 @@ int main(){
     Graph<int> mini_g = G.generateInterestPointsGraph(ip);
     GraphPrintInfo(mini_g);
     cout << mini_g.getVertexSet().size() << endl;
+     */
 
+    Graph<unsigned> g;
+    Graph<unsigned> gg;
+    cout << "Importing graph..." << endl;
+    time_t start_time = time(NULL);
+    g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt");
+    cout << "Calculating scc..." << endl;
+    cout << "STRONG Detected " << g.dfsConnectivity().size() << " scc's" << endl;
+    cout << "Importing graph..." << endl;
+    gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
+    cout << "Calculating scc..." << endl;
+    cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
+    //g.importGraph("../resources/Espinho/espinho_strong_nodes_xy.txt", "../resources/Espinho/espinho_strong_edges.txt");
+    time_t end_time = time(NULL);
+    //cout << "Finished importing graph in " << end_time - start_time << " s" << endl;
+    //vector<unsigned> ids {53619, 21329, 48150, 26850};
+    //vector<unsigned> ids {8932, 13373};
+    //cout << "Running Dijkstra..." << endl;
+    //Graph<unsigned> minig = g.generateInterestPointsGraph(ids);
+    //GraphPrintInfo(g);
+
+    //minig.viewGraph();
+    //g.viewGraphPath(minig);
 }
