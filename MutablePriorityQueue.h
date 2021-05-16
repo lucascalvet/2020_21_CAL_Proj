@@ -1,6 +1,3 @@
-#ifndef INC_2020_21_CAL_PROJ_MUTABLEPRIORITYQUEUE_H
-#define INC_2020_21_CAL_PROJ_MUTABLEPRIORITYQUEUE_H
-
 /*
  * MutablePriorityQueue.h
  * A simple implementation of mutable priority queues, required by Dijkstra algorithm.
@@ -29,6 +26,7 @@ class MutablePriorityQueue {
 public:
     MutablePriorityQueue();
     void insert(T * x);
+    void insertOrDecreaseKey(T * x);
     T * extractMin();
     void decreaseKey(T * x);
     bool empty();
@@ -56,7 +54,6 @@ T* MutablePriorityQueue<T>::extractMin() {
     H[1] = H.back();
     H.pop_back();
     if(H.size() > 1) heapifyDown(1);
-    heapifyDown(1);
     x->queueIndex = 0;
     return x;
 }
@@ -65,6 +62,14 @@ template <class T>
 void MutablePriorityQueue<T>::insert(T *x) {
     H.push_back(x);
     heapifyUp(H.size()-1);
+}
+
+template <class T>
+void MutablePriorityQueue<T>::insertOrDecreaseKey(T *x) {
+    if (x->queueIndex == 0)
+        insert(x);
+    else
+        decreaseKey(x);
 }
 
 template <class T>
@@ -106,6 +111,3 @@ void MutablePriorityQueue<T>::set(unsigned i, T * x) {
 }
 
 #endif /* SRC_MUTABLEPRIORITYQUEUE_H_ */
-
-
-#endif //INC_2020_21_CAL_PROJ_MUTABLEPRIORITYQUEUE_H
