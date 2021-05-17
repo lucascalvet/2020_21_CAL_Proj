@@ -203,6 +203,8 @@ void Edge<T>::setComplexPath(std::vector<Edge<T> *> complex_path) {
 template<class T>
 class Graph {
     std::vector<Vertex<T> *> vertexSet;
+    bool ipGraph = false; //Interest points graph
+    std::vector<std::vector<double>> distance; //Initialize only for IP Graphs
 
 public:
     std::vector<Vertex<T> *> nearestNeighbour(const T &origin_info);
@@ -471,7 +473,92 @@ Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) 
 
 template<class T>
 void Graph<T>::heldKarp(const T &origin) {
+    //Initialize vertices vector with origin in last place
+    Vertex<T> *orig = findVertex(origin);
+    if (orig == nullptr) {
+        std::cout << "[Held-Karp] Invalid origin!\n";
+        return;
+    }
+    std::vector<Vertex<T> *> vertices = vertexSet;
+    vertices.erase(std::find(vertices.begin(), vertices.end(), orig));
+    vertices.push_back(orig);
 
+    //Build distance matrix
+    std::vector<std::vector<double>> distance(vertices.size(), std::vector<double>(vertices.size(), 0));
+    std::vector<Edge<T> *> edges;
+    bool found_edge = false;
+    for (unsigned i = 0; i < vertices.size(); i++) {
+        edges = vertices.at(i)->outgoing;
+        for (unsigned j = 0; i < vertices.size(); j++) {
+            if (i == j) continue;
+            for (auto edge = edges.begin(); edge < edges.end(); edge++) {
+                if ((*edge)->dest == vertices.at(j)) {
+                    distance.at(i).at(j) = (*edge)->cost;
+                    edges.erase(edge);
+                    found_edge = true;
+                    break;
+                }
+            }
+            if (!found_edge) {
+                std::cout << "[Held-Karp] No edge connecting " << vertices.at(i)->info << " to "
+                          << vertices.at(j)->info << "!\n";
+                return;
+            }
+        }
+    }
+
+    //Initialize best distance and corresponding path vectors
+    std::vector<std::vector<unsigned>> best(1 << (vertices.size() - 1),
+                                            std::vector<unsigned>(vertices.size(), UINT_MAX));
+    std::vector<std::vector<unsigned>> path(1 << (vertices.size() - 1),
+                                            std::vector<unsigned>(vertices.size(), UINT_MAX));
+    unsigned temp_dist;
+    //Iterate through combinations of vertices encoded in bits
+    for (unsigned visited = 1; visited < (1 << vertices.size() - 1); visited++) {
+        //Iterate through the possible last vertices in a path
+        for (unsigned last = 0; last < vertices.size() - 1; last++) {
+            //The last vertices for a certain visited combination need to be part of that combination
+            if (!(visited & 1 << last)) continue;
+
+            //If there is only one vertex in visited, the minimum distance is the one from the origin to last
+            if (visited == 1 << last) {
+                best.at(visited).at(last) = distance.at(vertices.size() - 1).at(last);
+                path.at(visited).at(last) = vertices.size() - 1;
+            } else {
+                unsigned prev_visited = visited ^ (1 << last); //possible previous visited indexes
+                for (unsigned cand_prev = 0; cand_prev < vertices.size() - 1; cand_prev++) {
+                    if (!(prev_visited & 1 << cand_prev)) continue; //discard impossible previous indexes
+                    temp_dist = best.at(prev_visited).at(cand_prev) + distance.at(cand_prev).at(last);
+                    if (temp_dist < best.at(visited).at(last)) {
+                        best.at(visited).at(last) = temp_dist;
+                        path.at(visited).at(last) = cand_prev;
+                    }
+                }
+            }
+        }
+    }
+
+    //Get the cheapest path from the precomputed path lengths using all but the origin vertex
+    unsigned final_dist, second_to_last;
+    for (unsigned last = 0; last < vertices.size() - 1; last++) {
+        temp_dist = best.at((1 << (vertices.size() - 1)) - 1).at(last) + distance.at(last).at(vertices.size() - 1);
+        if (temp_dist < final_dist) {
+            final_dist = temp_dist;
+            second_to_last = last;
+        }
+    }
+
+    //Populate the path attribute in the vertices
+    unsigned last = second_to_last, visited = (1 << (vertices.size() - 1)) - 1;
+    vertices.at(vertices.size() - 1)->path = vertices.at(second_to_last);
+    for (unsigned i = 0; i < vertices.size() - 1; i++) {
+        vertices.at(last)->path = vertices.at(path.at(visited).at(last));
+        visited ^= 1 << last;
+        last = path.at(visited).at(last);
+    }
+    if (visited == 0) {
+        std::cout << "[Held-Karp] All good!\n";
+    }
 }
 
 template<class T>
