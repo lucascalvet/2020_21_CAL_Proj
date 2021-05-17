@@ -9,6 +9,7 @@
 #include <fstream>
 #include <graphviewer.h>
 #include <sstream>
+#include <string>
 #include "MutablePriorityQueue.h"
 #include "Utils.h"
 
@@ -39,13 +40,13 @@ class Vertex {
     std::vector<Edge<T> *> incoming;
     std::vector<Edge<T> *> adj;
 
-    bool visited;  // for path finding
+    bool visited = false;  // for path finding
     //Edge<T> *path; // for path finding
     Vertex<T> *path = NULL;
-    double dist;   // for path finding
+    double dist = INF;   // for path finding
     int queueIndex = 0; // required by MutablePriorityQueue
 
-    Vertex(T in);
+    explicit Vertex(T in);
 
     Vertex(T in, double x, double y);
 
@@ -76,7 +77,7 @@ public:
 };
 
 template<class T>
-Vertex<T>::Vertex(T in): info(in) {}
+Vertex<T>::Vertex(T in): info(in), x(0), y(0) {}
 
 template<class T>
 Vertex<T>::Vertex(T in, double x, double y): info(in), x(x), y(y) {}
@@ -120,11 +121,7 @@ class Edge {
     Vertex<T> *orig;
     Vertex<T> *dest;
     std::vector<T> complex_path;
-    double capacity;
     double cost;
-    double flow;
-
-    Edge(Vertex<T> *o, Vertex<T> *d, double capacity, double cost = 0, double flow = 0);
 
 public:
     Edge(Vertex<T> *o, Vertex<T> *d, double cost, std::vector<T> complex_path);
@@ -157,10 +154,6 @@ template<class T>
 Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, double cost, std::vector<T> complex_path): orig(o), dest(d), cost(cost) {
     this->complex_path = complex_path;
 }
-
-template<class T>
-Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, double capacity, double cost, double flow):
-        orig(o), dest(d), capacity(capacity), cost(cost), flow(flow) {}
 
 template<class T>
 Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, double cost):
@@ -207,7 +200,7 @@ class Graph {
     std::vector<std::vector<double>> distance; //Initialize only for IP Graphs
 
 public:
-    std::vector<Vertex<T> *> nearestNeighbour(const T &origin_info);
+    void nearestNeighbour(const T &origin_info);
 
     void dijkstraShortestPath(const T &origin);
 
@@ -225,6 +218,8 @@ public:
 
     Vertex<T> *findVertex(const T &inf) const;
 
+    Edge<T> *findEdge(const T &og, const T &dest) const;
+
     std::vector<Vertex<T> *> getVertexSet() const;
 
     Vertex<T> *addVertex(const T &in);
@@ -239,11 +234,17 @@ public:
 
     Edge<T> *addEdge(const T &sourc, const T &dest);
 
-    std::vector<T> getPath(const T &origin, const T &dest) const;
+    std::pair<std::vector<T> , double> getPath(const T &origin, const T &dest) const;
 
     void viewGraph();
 
-    void viewGraphPath(Graph<T> igraph);
+    void viewGraphIP(Graph<T> igraph);
+
+    void viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool remove_extra_nodes = false,
+                       bool remove_extra_edges = false, bool show_w=false, bool show_nid=false);
+
+    void viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool remove_extra_nodes = false,
+                         bool remove_extra_edges = false, bool show_w=false, bool show_nid=false);
 
     void importGraph(std::string vertex_filename, std::string edges_filename);
 };
@@ -317,6 +318,16 @@ Vertex<T> *Graph<T>::findVertex(const T &inf) const {
     for (auto v : vertexSet)
         if (v->info == inf)
             return v;
+    return nullptr;
+}
+
+template<class T>
+Edge<T> *Graph<T>::findEdge(const T &og, const T &dest) const {
+    for (auto v : vertexSet) {
+        for (auto edge : v->getOutgoing()) {
+            if (edge->orig->getInfo() == og && edge->dest->getInfo() == dest) return edge;
+        }
+    }
     return nullptr;
 }
 
@@ -418,21 +429,29 @@ void Graph<T>::dijkstraShortestPath(const T &origin) {
 }
 
 template<class T>
-std::vector<T> Graph<T>::getPath(const T &origin, const T &dest) const {
-    std::vector<T> res;
+std::pair<std::vector<T> , double> Graph<T>::getPath(const T &origin, const T &dest) const {
+    std::vector<T> path;
+    double total_dist = 0;
 
     Vertex<T> *v = this->findVertex(dest);
-    if (v == nullptr || v->dist == INF) return res;
+    if (v == nullptr || v->dist == INF) return std::pair<std::vector<T> , double>(path, total_dist);
 
     while (true) {
-        res.push_back(v->info);
-        if (v->info == origin) break;
+        path.push_back(v->info);
+        total_dist += v->dist;
         v = v->path;
+        if (v == nullptr) {
+            return std::pair<std::vector<T> , double>(path, total_dist);
+        }
+        if (v->info == origin) {
+            path.push_back(v->info);
+            break;
+        }
     }
 
-    std::reverse(res.begin(), res.end());
+    std::reverse(path.begin(), path.end());
 
-    return res;
+    return std::pair<std::vector<T> , double>(path, total_dist);
 }
 
 template<class T>
@@ -454,16 +473,10 @@ Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) 
         //Graph<T> copy = complete_graph;
         this->dijkstraShortestPath(current_info);
         //copy.dijkstraShortestPath(current_info);
-        std::cout << std::endl << "I(" << i << ") -> currentInfo = " << current_info << std::endl;
         for (int j = 0; j < important_points.size(); j++) {
             if (important_points[j] != current_info) {
-                std::vector<T> path = this->getPath(current_info, important_points[j]);
-                double dist = this->findVertex(important_points[j])->getDist();
-                std::cout << "J(" << j << ") -> Info = " << important_points[j] << std::endl;
-                std::cout << "J(" << j << ") -> dist = " << dist << std::endl;
-                std::cout << "J(" << j << ") -> path = ";
-                for (int a = 0; a < path.size(); a++) std::cout << path[a] << ", ";
-                std::cout << std::endl;
+                std::vector<T> path = (getPath(current_info, important_points[j])).first;
+                double dist = findVertex(important_points[j])->getDist();
                 result.addEdge(current_info, important_points[j], dist, path);
             }
         }
@@ -484,12 +497,13 @@ void Graph<T>::heldKarp(const T &origin) {
     vertices.push_back(orig);
 
     //Build distance matrix
+    std::cout << "[Held-Karp] Building distance matrix...\n";
     std::vector<std::vector<double>> distance(vertices.size(), std::vector<double>(vertices.size(), 0));
     std::vector<Edge<T> *> edges;
     bool found_edge = false;
     for (unsigned i = 0; i < vertices.size(); i++) {
         edges = vertices.at(i)->outgoing;
-        for (unsigned j = 0; i < vertices.size(); j++) {
+        for (unsigned j = 0; j < vertices.size(); j++) {
             if (i == j) continue;
             for (auto edge = edges.begin(); edge < edges.end(); edge++) {
                 if ((*edge)->dest == vertices.at(j)) {
@@ -507,6 +521,7 @@ void Graph<T>::heldKarp(const T &origin) {
         }
     }
 
+    std::cout << "[Held-Karp] Calculate shortest paths...\n";
     //Initialize best distance and corresponding path vectors
     std::vector<std::vector<unsigned>> best(1 << (vertices.size() - 1),
                                             std::vector<unsigned>(vertices.size(), UINT_MAX));
@@ -525,7 +540,7 @@ void Graph<T>::heldKarp(const T &origin) {
                 best.at(visited).at(last) = distance.at(vertices.size() - 1).at(last);
                 path.at(visited).at(last) = vertices.size() - 1;
             } else {
-                unsigned prev_visited = visited ^ (1 << last); //possible previous visited indexes
+                unsigned prev_visited = visited ^(1 << last); //possible previous visited indexes
                 for (unsigned cand_prev = 0; cand_prev < vertices.size() - 1; cand_prev++) {
                     if (!(prev_visited & 1 << cand_prev)) continue; //discard impossible previous indexes
                     temp_dist = best.at(prev_visited).at(cand_prev) + distance.at(cand_prev).at(last);
@@ -538,6 +553,7 @@ void Graph<T>::heldKarp(const T &origin) {
         }
     }
 
+    std::cout << "[Held-Karp] Calculate final shortest path...\n";
     //Get the cheapest path from the precomputed path lengths using all but the origin vertex
     unsigned final_dist, second_to_last;
     for (unsigned last = 0; last < vertices.size() - 1; last++) {
@@ -548,43 +564,53 @@ void Graph<T>::heldKarp(const T &origin) {
         }
     }
 
-    //Populate the path attribute in the vertices
-    unsigned last = second_to_last, visited = (1 << (vertices.size() - 1)) - 1;
+    std::cout << "[Held-Karp] Populate path and dist attributes...\n";
+    //Populate the path and dist attribute in the vertices
+    unsigned last = second_to_last, visited = (1 << (vertices.size() - 1)) - 1, temp_last;
     vertices.at(vertices.size() - 1)->path = vertices.at(second_to_last);
+    vertices.at(vertices.size() - 1)->dist = distance.at(second_to_last).at(vertices.size() - 1);
     for (unsigned i = 0; i < vertices.size() - 1; i++) {
         vertices.at(last)->path = vertices.at(path.at(visited).at(last));
-        visited ^= 1 << last;
-        last = path.at(visited).at(last);
+        vertices.at(last)->dist = distance.at(path.at(visited).at(last)).at(last);
+        temp_last = path.at(visited).at(last);
+        visited ^= (1 << last);
+        last = temp_last;
     }
     if (visited == 0) {
         std::cout << "[Held-Karp] All good!\n";
-    }
+    } else std::cout << "[Held-Karp] All is not good :)!\n";
 }
 
 template<class T>
-std::vector<Vertex<T> *> Graph<T>::nearestNeighbour(const T &origin_info) { //TODO: Test!
+void Graph<T>::nearestNeighbour(const T &origin_info) {
     Vertex<T> *origin = findVertex(origin_info);
     for (auto v : vertexSet)
         v->visited = false;
-    std::vector<Vertex<T> *> path;
     origin->visited = true;
-    path.push_back(origin);
     double minWeight;
     Vertex<T> *nextVertex = origin;
-    do {
+    for (unsigned i = 0; i < vertexSet.size() - 1; i++) {
         minWeight = INF;
         auto adj = nextVertex->outgoing;
         for (auto edge : adj) {
-            if (!edge->dest->visited && edge->weight < minWeight) {
+            if (!edge->dest->visited && edge->cost < minWeight) {
                 minWeight = edge->cost;
                 nextVertex = edge->dest;
             }
         }
         nextVertex->visited = true;
-        path.push_back(nextVertex);
-    } while (minWeight != UINT_MAX);
-    path.push_back(origin);
-    return path;
+        nextVertex->dist = minWeight;
+        std::cout << "Dist from " << adj.at(0)->orig->info << " to " << nextVertex->info << ": " << minWeight << "\n";
+        nextVertex->path = adj.at(0)->orig;
+    }
+    origin->path = nextVertex;
+    auto adj = nextVertex->outgoing;
+    for (auto edge : adj) {
+        if (edge->dest == origin) {
+            origin->dist = edge->cost;
+            break;
+        }
+    }
 }
 
 template<class T>
@@ -657,7 +683,7 @@ void Graph<T>::viewGraph() {
 }
 
 template<class T>
-void Graph<T>::viewGraphPath(Graph<T> igraph) {
+void Graph<T>::viewGraphIP(Graph<T> igraph) {
     // Instantiate GraphViewer
     GraphViewer gv;
 
@@ -675,7 +701,6 @@ void Graph<T>::viewGraphPath(Graph<T> igraph) {
             }
         }
         if (highlight) {
-            std::cout << "HIGHLIGHT" << std::endl;
             node.setColor(GraphViewer::GREEN);
             node.setLabel("INTEREST");
         } else node.setColor(GraphViewer::RED);
@@ -721,6 +746,139 @@ void Graph<T>::viewGraphPath(Graph<T> igraph) {
     // Join viewer thread (blocks till window closed)
     gv.join();
 }
+
+template<class T>
+void Graph<T>::viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool remove_extra_nodes,
+                             bool remove_extra_edges, bool show_w, bool show_nid) {
+    // Instantiate GraphViewer
+    GraphViewer gv;
+    // Set coordinates of window center
+    gv.setCenter(sf::Vector2f(300, 300));
+    bool highlight = false;
+    bool special_highlight = false;
+
+    for (auto vertex : getVertexSet()) {
+        highlight = false;
+        special_highlight = false;
+        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getX(), vertex->getY()));
+        if (vertex->getInfo() == path[0] || vertex->getInfo() == path[path.size() - 1]) special_highlight = true;
+        else {
+            for (auto id : interest_points) {
+                if (vertex->getInfo() == id) {
+                    highlight = true;
+                    break;
+                }
+            }
+        }
+        if (highlight) {
+            node.setColor(GraphViewer::GREEN);
+            node.setLabel("INTEREST");
+            node.setLabel(std::to_string(node.getId()));
+        } else {
+            if (special_highlight) {
+                node.setLabel("SPECIAL_INTEREST");
+                node.setLabel(std::to_string(node.getId()));
+            } else{
+                node.setColor(GraphViewer::RED);
+                if(show_nid) node.setLabel(std::to_string(node.getId()));
+            }
+        }
+    }
+
+
+    unsigned counter = 0;
+    bool special_edge;
+    for (auto vertex : getVertexSet()) {
+        for (auto edge : vertex->getOutgoing()) {
+            special_edge = false;
+            GraphViewer::Edge &road = gv.addEdge(counter, gv.getNode(vertex->getInfo()),
+                                                 gv.getNode(edge->getDest()->getInfo()), GraphViewer::Edge::DIRECTED);
+            for (int i = 0; i < path.size() - 1; i++) {
+                if (edge->getOrigin()->getInfo() == path[i] && edge->getDest()->getInfo() == path[i + 1]){
+                    special_edge = true;
+                    break;
+                }
+            }
+            if(special_edge){
+                road.setColor(GraphViewer::BLUE);
+                if(show_w) road.setWeight(edge->cost);
+            }
+            else road.setColor(GraphViewer::BLACK);
+            //road.setWeight(edge->cost);
+            counter++;
+        }
+    }
+
+    /*
+    for (int i = 0; i < path.size() - 1; i++) {
+        for (GraphViewer::Edge *road: gv.getEdges()) {
+            if (road->getFrom()->getId() == path[i] && road->getTo()->getId() == path[i + 1]) {
+                road->setColor(GraphViewer::BLUE);
+                //road->setLabel(std::to_string(*road->getWeight()));
+                break;
+            }
+        }
+    }
+     */
+
+
+    if (remove_extra_nodes) {
+        bool ip;
+        for (GraphViewer::Node *node : gv.getNodes()) {
+            ip = false;
+            for (auto id : interest_points) {
+                if (id == node->getId()) {
+                    ip = true;
+                    break;
+                }
+            }
+            //if(!ip) gv.removeNode(node->getId());
+            if (!ip) node->setSize(0.0);
+        }
+    }
+
+    if (remove_extra_edges) {
+        bool ie;
+        for (GraphViewer::Edge *edge: gv.getEdges()) {
+            ie = false;
+            for(int i = 0; i < path.size() - 1; i++){
+                if (edge->getFrom()->getId() == path[i] && edge->getTo()->getId() == path[i + 1]) {
+                    ie = true;
+                    break;
+                }
+            }
+            if(!ie) {
+                edge->setThickness(0.0);
+            }
+        }
+    }
+
+    // Create window
+    gv.createWindow(600, 600);
+
+    // Join viewer thread (blocks till window closed)
+    gv.join();
+}
+
+
+template<class T>
+void Graph<T>::viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool remove_extra_nodes, bool remove_extra_edges, bool show_w, bool show_nid) {
+    std::vector<T> interest_points;
+    for (auto vertex : igraph.getVertexSet()) {
+        interest_points.push_back(vertex->getInfo());
+    }
+
+    std::vector<T> real_path;
+    for (int i = 0; i < path.size() - 1; i++) {
+        Edge<T> *edge = igraph.findEdge(path[i], path[i + 1]);
+        for (auto id : edge->complex_path) {
+            if (real_path.empty() || real_path[real_path.size() - 1] != id) real_path.push_back(id);
+        }
+    }
+
+    viewGraphPath(real_path, interest_points, remove_extra_nodes, remove_extra_edges, show_w, show_nid);
+}
+
 
 template<class T>
 bool Graph<T>::checkConectivity(std::vector<T> ids) {

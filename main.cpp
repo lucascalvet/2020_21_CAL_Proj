@@ -1,7 +1,5 @@
 #include <iostream>
-#include <string>
 #include "Graph.h"
-#include <math.h>
 #include <ctime>
 
 using namespace std;
@@ -212,27 +210,50 @@ int main(){
     cout << "STRONG Detected " << g.dfsConnectivity().size() << " scc's" << endl;
      */
     cout << "Importing graph..." << endl;
-    gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
+    g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt");
+    //gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
     //cout << "Calculating scc..." << endl;
     //cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
     //g.importGraph("../resources/Espinho/espinho_strong_nodes_xy.txt", "../resources/Espinho/espinho_strong_edges.txt");
     //time_t end_time = time(NULL);
     //cout << "Finished importing graph in " << end_time - start_time << " s" << endl;
-    vector<unsigned> ids = {4, 6, 7, 8};
+    vector<unsigned> ids = {9, 11, 26, 26806, 26809, 26820, 47, 62};
     //vector<unsigned> ids {8932, 13373};
     cout << "Running Dijkstra..." << endl;
-    //Graph<unsigned> minig = g.generateInterestPointsGraph(ids);
+    Graph<unsigned> minig = g.generateInterestPointsGraph(ids);
     //Graph<unsigned> minig = gg.generateInterestPointsGraph(ids);
     //GraphPrintInfo(g);
 
     //minig.viewGraph();
 
+    cout << "Running Held-Karp..." << endl;
+    minig.heldKarp(11);
+    cout << "Getting path..." << endl;
+    pair<vector<unsigned> , double> hk_path = minig.getPath(11, 11);
+
+
+    cout << "GraphViewer..." << endl;
     /*
     if(minig.getVertexSet().size() != 0){
-        g.viewGraphPath(minig);
+        g.viewGraphIP(minig);
     }
      */
 
-    g.viewGraph();
+    //minig.viewGraphPath(hk_path.first, ids, false, true);
+    //g.viewGraph();
+
+    //g.viewGraphPathIP(minig, hk_path.first, true, true);
+    minig.viewGraphPath(hk_path.first, ids, true, true, true);
+
+    cout << "Running Nearest Neighbour..." << endl;
+    minig.nearestNeighbour(11);
+    cout << "Getting path..." << endl;
+    pair<vector<unsigned> , double> nn_path = minig.getPath(11, 11);
+
+    cout << "GraphViewer..." << endl;
+    minig.viewGraphPath(nn_path.first, ids, true, true, true);
+
+    cout << "HK: " << hk_path.second << " vs NN: " << nn_path.second;
+    //g.viewGraphPathIP(minig, nn_path.first, true);
 
 }
