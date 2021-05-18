@@ -217,6 +217,17 @@ int main(){
     //g.importGraph("../resources/Espinho/espinho_strong_nodes_xy.txt", "../resources/Espinho/espinho_strong_edges.txt");
     //time_t end_time = time(NULL);
     //cout << "Finished importing graph in " << end_time - start_time << " s" << endl;
+    g.setEarlyTime(5);
+    g.setStartTime(0);
+    g.setVelocity(100);
+    g.setVisitTime(5);
+    g.findVertex(9)->setTimes(20, 10, 25);
+    g.findVertex(26)->setTimes(35, 10, 25);
+    g.findVertex(26806)->setTimes(50, 10, 25);
+    g.findVertex(26809)->setTimes(80, 10, 25);
+    g.findVertex(26820)->setTimes(110, 10, 25);
+    g.findVertex(47)->setTimes(125, 10, 25);
+    g.findVertex(62)->setTimes(140, 10, 25);
     vector<unsigned> ids = {9, 11, 26, 26806, 26809, 26820, 47, 62};
     //vector<unsigned> ids {8932, 13373};
     cout << "Running Dijkstra..." << endl;
@@ -228,6 +239,7 @@ int main(){
 
     cout << "Running Held-Karp..." << endl;
     minig.heldKarp(11);
+
     cout << "Getting path..." << endl;
     pair<vector<unsigned> , double> hk_path = minig.getPath(11, 11);
 
@@ -246,7 +258,8 @@ int main(){
     minig.viewGraphPath(hk_path.first, ids, true, true, true);
 
     cout << "Running Nearest Neighbour..." << endl;
-    minig.nearestNeighbour(11);
+    //minig.nearestNeighbour(11);
+    minig.nearestNeighbourTimes(11);
     cout << "Getting path..." << endl;
     pair<vector<unsigned> , double> nn_path = minig.getPath(11, 11);
 
@@ -254,6 +267,7 @@ int main(){
     minig.viewGraphPath(nn_path.first, ids, true, true, true);
 
     cout << "HK: " << hk_path.second << " vs NN: " << nn_path.second;
+    minig.printTimes();
     //g.viewGraphPathIP(minig, nn_path.first, true);
 
 }

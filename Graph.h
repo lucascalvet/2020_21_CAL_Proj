@@ -46,7 +46,15 @@ class Vertex {
     double dist = INF;   // for path finding
     int queueIndex = 0; // required by MutablePriorityQueue
 
+    unsigned hour;
+    unsigned tolerance;
+    unsigned max_tolerance;
+    unsigned quantity;
+    unsigned visited_at;
+
     explicit Vertex(T in);
+
+    Vertex(T in, double x, double y, unsigned hour, unsigned tolerance, unsigned max_tolerance);
 
     Vertex(T in, double x, double y);
 
@@ -71,6 +79,8 @@ public:
 
     void setY(double y) { this->y = y; }
 
+    void setTimes(unsigned hour, unsigned tolerance, unsigned max_tolerance) {this->hour = hour; this->tolerance = tolerance; this->max_tolerance = max_tolerance;}
+
     friend class Graph<T>;
 
     friend class MutablePriorityQueue<Vertex<T>>;
@@ -81,6 +91,9 @@ Vertex<T>::Vertex(T in): info(in), x(0), y(0) {}
 
 template<class T>
 Vertex<T>::Vertex(T in, double x, double y): info(in), x(x), y(y) {}
+
+template<class T>
+Vertex<T>::Vertex(T in, double x, double y, unsigned hour, unsigned tolerance, unsigned max_tolerance): info(in), x(x), y(y), hour(hour), tolerance(tolerance), max_tolerance(max_tolerance) {}
 
 template<class T>
 void Vertex<T>::addEdge(Edge<T> *e) {
@@ -198,9 +211,29 @@ class Graph {
     std::vector<Vertex<T> *> vertexSet;
     bool ipGraph = false; //Interest points graph
     std::vector<std::vector<double>> distance; //Initialize only for IP Graphs
+    unsigned start_time = 0;
+public:
+    unsigned int getStartTime() const;
+
+    void setStartTime(unsigned int startTime);
+
+    unsigned int getVisitTime() const;
+
+    void setVisitTime(unsigned int visitTime);
+
+    unsigned int getEarlyTime() const;
+
+    void setEarlyTime(unsigned int earlyTime);
+
+private:
+    unsigned visit_time = 5;
+    unsigned early_time = 10;
+    unsigned velocity = 50;
 
 public:
     void nearestNeighbour(const T &origin_info);
+
+    void nearestNeighbourTimes(const T &origin_info);
 
     void dijkstraShortestPath(const T &origin);
 
@@ -226,6 +259,8 @@ public:
 
     Vertex<T> *addVertex(const T &in, const double &x, const double &y);
 
+    Vertex<T> *addVertex(const T &in, const double &x, const double &y, const unsigned &hour, const unsigned &tolerance, const unsigned &max_tolerance);
+
     Edge<T> *addEdge(const T &sourc, const T &dest, double capacity, double cost, double flow = 0);
 
     Edge<T> *addEdge(const T &sourc, const T &dest, double cost, std::vector<T> complex_path);
@@ -235,6 +270,10 @@ public:
     Edge<T> *addEdge(const T &sourc, const T &dest);
 
     std::pair<std::vector<T> , double> getPath(const T &origin, const T &dest) const;
+
+    unsigned getVelocity() {return this->velocity;}
+
+    void setVelocity(unsigned velocity) {this->velocity = velocity;}
 
     void viewGraph();
 
@@ -247,6 +286,8 @@ public:
                          bool remove_extra_edges = false, bool show_w=false, bool show_nid=false);
 
     void importGraph(std::string vertex_filename, std::string edges_filename);
+
+    void printTimes();
 };
 
 template<class T>
@@ -268,6 +309,17 @@ Vertex<T> *Graph<T>::addVertex(const T &in, const double &x, const double &y) {
     vertexSet.push_back(v);
     return v;
 }
+
+template<class T>
+Vertex<T> *Graph<T>::addVertex(const T &in, const double &x, const double &y, const unsigned &hour, const unsigned &tolerance, const unsigned &max_tolerance){
+    Vertex<T> *v = findVertex(in);
+    if (v != nullptr)
+        return v;
+    v = new Vertex<T>(in, x, y, hour, tolerance, max_tolerance);
+    vertexSet.push_back(v);
+    return v;
+}
+
 
 template<class T>
 Edge<T> *Graph<T>::addEdge(const T &sourc, const T &dest, double capacity, double cost, double flow) {
@@ -336,6 +388,35 @@ std::vector<Vertex<T> *> Graph<T>::getVertexSet() const {
     return vertexSet;
 }
 
+template<class T>
+unsigned int Graph<T>::getStartTime() const {
+    return start_time;
+}
+
+template<class T>
+void Graph<T>::setStartTime(unsigned int startTime) {
+    start_time = startTime;
+}
+
+template<class T>
+unsigned int Graph<T>::getVisitTime() const {
+    return visit_time;
+}
+
+template<class T>
+void Graph<T>::setVisitTime(unsigned int visitTime) {
+    visit_time = visitTime;
+}
+
+template<class T>
+unsigned int Graph<T>::getEarlyTime() const {
+    return early_time;
+}
+
+template<class T>
+void Graph<T>::setEarlyTime(unsigned int earlyTime) {
+    early_time = earlyTime;
+}
 
 /*
  * *************** DFS  ************
@@ -614,11 +695,57 @@ void Graph<T>::nearestNeighbour(const T &origin_info) {
 }
 
 template<class T>
+void Graph<T>::nearestNeighbourTimes(const T &origin_info) {
+    Vertex<T> *origin = findVertex(origin_info);
+    for (auto v : vertexSet)
+        v->visited = false;
+    origin->visited = true;
+    unsigned min_hour, current_time = start_time;
+    double dist;
+    Vertex<T> *next_vertex = origin;
+    Edge<T> *chosen_edge;
+    std::cout << "[Nearest Neighbour Times] Starting search...\n";
+    for (unsigned i = 0; i < vertexSet.size() - 1; i++) {
+        min_hour = UINT_MAX;
+        auto adj = next_vertex->outgoing;
+        for (auto edge : adj) {
+            if (!edge->dest->visited && edge->dest->hour < min_hour) {
+                min_hour = edge->dest->hour;
+                next_vertex = edge->dest;
+                dist = edge->cost;
+                chosen_edge = edge;
+            }
+        }
+        std::cout << "[Nearest Neighbour Times] The time is: " << current_time << ".\n";
+        current_time += chosen_edge->cost / velocity;
+        std::cout << "[Nearest Neighbour Times] Choosed client " << next_vertex->info << ". Arrived at" << current_time << ".\n";
+        if (current_time < chosen_edge->dest->hour - early_time) {
+            current_time = chosen_edge->dest->hour - early_time;
+            std::cout << "[Nearest Neighbour Times] Too early, waiting until " << current_time << ".\n";
+        }
+        current_time += visit_time;
+        next_vertex->visited = true;
+        next_vertex->dist = dist;
+        next_vertex->visited_at = current_time;
+        next_vertex->path = adj.at(0)->orig;
+        std::cout << "[Nearest Neighbour Times] Delivered to client " << next_vertex->info << ", leaving at " << current_time << "\n";
+    }
+    origin->path = next_vertex;
+    auto adj = next_vertex->outgoing;
+    for (auto edge : adj) {
+        if (edge->dest == origin) {
+            origin->dist = edge->cost;
+            break;
+        }
+    }
+}
+
+template<class T>
 void Graph<T>::importGraph(std::string vertex_filename, std::string edges_filename) {
     std::ifstream vertex_file(vertex_filename);
     std::ifstream edge_file(edges_filename);
     if (vertex_file.fail() || edge_file.fail()) {
-        std::cout << "Failed to open files!" << std::endl;
+        std::cout << "[importGraph] Failed to open files!" << std::endl;
         return;
     }
     unsigned n_vertex = 0;
@@ -910,5 +1037,16 @@ bool Graph<T>::checkConectivity(std::vector<T> ids) {
     }
     return true;
 }
+
+template<class T>
+void Graph<T>::printTimes(){
+    for(auto vertex : vertexSet){
+        if(vertex->hour > 0){
+            unsigned delta_time = vertex->visited_at - vertex->hour;
+            std::cout << "V" << vertex->info << ": tol= " << vertex->tolerance << " | max_tol= " << vertex->max_tolerance << " | hour= " << vertex->hour << " | visited_at= " << vertex->visited_at << " | delta= " << delta_time << std::endl;
+        }
+    }
+}
+
 
 #endif /* PROJ_GRAPH_H_ */
