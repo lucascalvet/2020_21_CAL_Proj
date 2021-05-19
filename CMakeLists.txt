@@ -15,5 +15,5 @@ include_directories(.)
 
 # Add the source files
 file(GLOB SRC_FILES CONFIGURE_DEPENDS "*.cpp" "*.h")
-add_executable(2020_21_CAL_Proj main.cpp Graph.h Utils.cpp Utils.h)
+add_executable(2020_21_CAL_Proj main.cpp Graph.h Utils.cpp Utils.h Menu.h Menu.cpp)
 target_link_libraries(2020_21_CAL_Proj graphviewer)
