@@ -93,7 +93,7 @@ public:
         RShift,       ///< The right Shift key
         RAlt,         ///< The right Alt key
         RSystem,      ///< The right OS specific key: window (Windows and Linux), apple (MacOS X), ...
-        Menu,         ///< The Menu key
+        Menu,         ///< The Menu_old key
         LBracket,     ///< The [ key
         RBracket,     ///< The ] key
         Semicolon,    ///< The ; key

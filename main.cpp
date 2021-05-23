@@ -1,6 +1,7 @@
 #include <iostream>
-#include "Graph.h"
 #include <ctime>
+#include "Graph.h"
+#include "Menu.h"
 
 using namespace std;
 
@@ -33,6 +34,87 @@ void PrintVector(vector<T> vec, string title) {
             cout << ", ";
         }
         else cout << endl;
+    }
+}
+
+void importMap(Graph<unsigned>& map) {
+    Menu map_menu("Carregar mapa");
+    map_menu.pushOption("Porto");
+    map_menu.pushOption("Espinho");
+    map_menu.pushOption("Importar de ficheiro (x, y)");
+    map_menu.pushOption("Importar de ficheiro (lat, long)");
+    map_menu.pushOption("Voltar");
+
+    string nodes_filename, edges_filename;
+    bool lat_lng = false;
+    unsigned choice;
+    choice = map_menu.chooseOption();
+    switch (choice) {
+        case 0:
+            nodes_filename = "../resources/Porto/porto_strong_nodes_xy.txt";
+            edges_filename = "../resources/Porto/porto_strong_edges.txt";
+            break;
+        case 1:
+            nodes_filename = "../resources/Espinho/espinho_strong_nodes_xy.txt";
+            edges_filename = "../resources/Espinho/espinho_strong_edges.txt";
+            break;
+        case 2:
+        case 3:
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Ficheiro de vértices: ";
+            cin >> nodes_filename;
+            while (cin.fail() || cin.peek() != '\n') {
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cout << "Input inválido! Insira um caminho de ficheiro válido.\n";
+                cout << "Caminho do ficheiro de vértices: ";
+                cin >> nodes_filename;
+            }
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Ficheiro de arestas: ";
+            cin >> edges_filename;
+            while (cin.fail() || cin.peek() != '\n') {
+                cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                cout << "Input inválido! Insira um caminho de ficheiro válido".\n";
+                cout << "Caminho do ficheiro de arestas: ";
+                cin >> edges_filename;
+            }
+            break;
+        case 4:
+            return;
+        default:
+            break;
+    }
+    if (choice == 3) lat_lng = true;
+    map.importGraph(nodes_filename, edges_filename, lat_lng);
+}
+
+void mainMenu() {
+    Graph<unsigned> main_map;
+    Menu main_menu("Menu principal");
+    main_menu.pushOption("Carregar mapa");
+    main_menu.pushOption("Visualizar mapa");
+    main_menu.pushOption("Definir padaria");
+    main_menu.pushOption("Definir clientes");
+    main_menu.pushOption("Alterar velocidade média");
+    main_menu.pushOption("Alterar velocidade média");
+    main_menu.pushOption("Reset");
+    main_menu.pushOption("Sair");
+    unsigned choice;
+    bool quit = false;
+    while (!quit) {
+        choice = main_menu.chooseOption();
+        switch (choice) {
+            case 0:
+                importMap(main_map);
+                break;
+            case 1:
+                main_map.viewGraph();
+                break;
+            case 7:
+                quit = true;
+            default:
+                break;
+        }
     }
 }
 

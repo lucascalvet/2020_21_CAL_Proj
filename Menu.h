@@ -1,87 +1,30 @@
-#ifndef HOTEL_MENU_H
-#define HOTEL_MENU_H
+#ifndef INC_2020_21_CAL_PROJ_MENU_H
+#define INC_2020_21_CAL_PROJ_MENU_H
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <list>
-#include <cmath>
 #include <string>
-#include <algorithm>
+#include <vector>
 
-using namespace std;
-
-class Menu{
+class Menu {
 private:
-    vector <string> membros = {};
+    std::string title;
+    std::vector<std::string> options;
 public:
-    Menu() {};
-    ~Menu() {};
+    explicit Menu(const std::string &title);
 
-    template<class T>
-    void PrintV(const vector<T> &v) {
-        int vsize = v.size();
-        cout << endl;
-        cout << "|||-> " << endl << endl;
-        for (int i = 0; vsize > i; i++){
-            v[i].Info();
-            cout << endl;
-        }
-        cout << "<-||| " << endl;
-    }
+    unsigned pushOption(const std::string& option);
 
-    template<class T>
-    void PrintList(const list<T> &l) {
-        cout << endl;
-        cout << "|||-> " << endl << endl;
-        for (auto it = l.begin(); it != l.end(); it++){
-            (*it).Info();
-            cout << endl;
-        }
-        cout << "<-||| " << endl;
-    }
+    void printOptions();
 
-    string NomeFicheiro();
-    void printTitle(string titulo);
-    void printOp(vector <string> opcoes, bool aviso, bool enm);
+    unsigned chooseOption();
 
-    unsigned ProcessarInputInt(vector <string> opcoes, string titulo, unsigned liminf, unsigned limsup);
-    unsigned ProcessInputInt(vector <string> opcoes, string titulo);
+    const std::string &getTitle() const;
 
-    vector <int> ProcessarIntIndef(string colecao_sing, string colecao_plural, int lim);
-    template<class T>
-    vector <int> ProcessarIntIndef(string colecao_sing, string colecao_plural, int lim, list <T> l);
+    void setTitle(const std::string &title);
 
-    template<class T>
-    T InputRestrito(string texto);
-    string InputNome(string texto);
-    char InputLetra(string texto);
-    //data InputData(string texto);
-    //nota_avaliacao InputNota(string texto);
+    const std::vector<std::string> &getOptions() const;
 
-    template<class T>
-    bool ProcuraValida(int id, list <T> l);
-
-    template<class T>
-    T EfetuarProcura(int id, list <T> l);
-
-    template<class T>
-    int ProcessarInputProcura(string titulo, list <T> l);
-
-    void Start();
-
-    //void Importar();
-    //void VerInfo();
-    //void Adicionar();
-    //void Apagar();
-    //void Exportar();
-    //void Outros();
-
-    void mainMenu();
-
-
-
+    void setOptions(const std::vector<std::string> &options);
 };
 
-#endif //HOTEL_MENU_H
+
+#endif //INC_2020_21_CAL_PROJ_MENU_H
