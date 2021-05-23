@@ -369,11 +369,17 @@ public:
 
     std::vector<Vertex<T> *> getOverlapClientsTravellingPtr(const Vertex<T>* info);
 
+    std::vector<T> getPerfectOverlapClientsTravelling(const T &info);
+
+    std::vector<T> getPerfectOverlapClientsTravelling(std::vector<T> remaining_clients, const T &info);
+
     double costFunctionStep(T og, std::vector<T> path, T new_element, double weight);
 
     double costFunctionTotal(T og, std::vector<T> path, double weight);
 
     double costFunctionTotalPtr(const Vertex<T>* og, std::vector<Vertex<T>*> path);
+
+    std::vector<T> getClusters(const T &origin);
 };
 
 template<class T>
@@ -765,6 +771,103 @@ public:
 };
 
 template<class T>
+class Cluster {
+private:
+    Graph<T> graph;
+    std::vector<T> info_set;
+    std::vector<Vertex<T> *> vertex_set;
+
+public:
+    Cluster(Graph<T> graph, std::vector<T> info_set){
+        this->graph = graph;
+        this->info_set = info_set;
+    }
+
+    std::vector<T> getInfoSet() {return info_set;}
+    std::vector<T> getVertexSet() {return vertex_set;}
+    void addInfo(T info) {info_set.push_back(info);}
+
+    void addVertex(Vertex<T> *v) {
+        vertex_set.push_back(v);
+        addInfo(v->info);
+    }
+
+    bool isInSet(T new_info){
+        for(T info : info_set){
+            if(new_info == info) return true;
+        }
+        return false;
+    }
+
+    std::pair<Vertex<T> *, unsigned> getArrivalHour(){
+        unsigned minHour = UINF;
+        Vertex<T> * selected_vertex = nullptr;
+        for(T info : info_set){
+            Vertex<T> * vertex = graph.findVertex(info);
+            if(vertex != nullptr){
+                unsigned vertex_mh = vertex->getHour() + vertex->getTolerance();
+                if(vertex_mh < minHour){
+                    minHour = vertex_mh;
+                    selected_vertex = vertex;
+                }
+            }
+        }
+        return std::pair<Vertex<T> *, unsigned>(selected_vertex, minHour);
+    };
+
+    std::pair<Vertex<T> *, unsigned> getDepartureHour(){
+        unsigned maxHour = 0;
+        Vertex<T> * selected_vertex = nullptr;
+        for(T info : info_set){
+            Vertex<T> * vertex = graph.findVertex(info);
+            if(vertex != nullptr){
+                unsigned vertex_mh = vertex->getHour() + vertex->getTolerance() + graph.getVisitTime();
+                if(vertex_mh > maxHour){
+                    maxHour = vertex_mh;
+                    selected_vertex = vertex;
+                }
+            }
+        }
+        return std::pair<Vertex<T> *, unsigned>(selected_vertex, maxHour);
+    };
+
+    double calculateClusterCost(Cluster<T> otherCluster);
+
+    void mergeCluster(Cluster<T> otherCluster);
+
+};
+
+template<class T>
+class ClusterCompare {
+public:
+    bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
+        return c1->getDepartureHour() < c2->getDepartureHour();
+    }
+};
+
+template<class T>
+void Cluster<T>::mergeCluster(Cluster<T> otherCluster){
+    for(T info : otherCluster.info_set){
+        if(!isInSet(info)) addInfo(info);
+    }
+}
+
+template<class T>
+double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster){
+    std::pair<Vertex<T> *, unsigned> departure = getDepartureHour();
+    std::pair<Vertex<T> *, unsigned> arrival = otherCluster.getArrivalHour();
+    if(arrival.first == nullptr || departure.first == nullptr) return -1;
+
+    Edge<T> * edge = graph.findEdge(departure.first->getInfo(), arrival.first->getInfo());
+    if(edge == nullptr) return INF;
+
+    double travelling_time = edge->getCost() / graph.getVelocity();
+    if(departure.second + travelling_time <= arrival.second) return 0;
+    else if (departure.second + travelling_time > arrival.first->getHour() + arrival.first->getMaxTolerance()) return INF;
+    else return departure.second + travelling_time - arrival.second;
+}
+
+template<class T>
 void Graph<T>::heldKarpTimes(const T &origin) {
     //Initialize vertices vector with origin in last place
     Vertex<T> *orig = findVertex(origin);
@@ -975,6 +1078,7 @@ void Graph<T>::bruteForceTimes(const T &origin) {
     }
 
     std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> client_queue;
+    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> temp_queue;
     //std::vector<T> vertices;
 
     for (Vertex<T> *v : vertexSet) {
@@ -984,18 +1088,50 @@ void Graph<T>::bruteForceTimes(const T &origin) {
         }
     }
 
-    int max;
-    //int max = (vertexSet-1)!;
+    unsigned client_no = client_queue.size();
 
-    std::vector<std::vector<unsigned>> path_matrix(max, std::vector<unsigned>(vertexSet.size() - 1, 0));
+
+    std::vector<std::vector<unsigned>> step_matrix(pow(client_no, 2), std::vector<unsigned>(client_no + 2, 0));
+    std::vector<unsigned> temp_path(client_no, 0);
 
     std::vector<T> overlap = getOverlapClientsTravelling(client_queue.top());
 
     for(int i = 0; i < overlap.size(); i++){
-        path_matrix[i][0] = overlap[i];
+        temp_queue = client_queue;
+        step_matrix[i][0] = overlap[i];
+        if(overlap[i] != temp_queue.top()) step_matrix[i][1] = temp_queue.top();
+        else{
+            temp_queue.pop();
+            step_matrix[i][1] = temp_queue.top();
+        }
+        step_matrix[i][2] = i + 1;
+    }
+
+    int counter = 0;
+    int level = 2;
+    int max_step = overlap.size();
+    int old_max_step = max_step;
+    int past_step = 0;
+    while(counter < client_no){
+        temp_queue = client_queue;
+        int old_max_step = max_step;
+        for(int i = past_step; i < old_max_step; i++){
+            temp_queue = client_queue;
+            while(temp_queue.top() != step_matrix[past_step][1]) temp_queue.pop();
+            overlap =  getOverlapClientsTravelling(temp_queue.top());
+
+            while(!overlap.empty()){
+                max_step++;
+                step_matrix[max_step][level] = past_step;
+                step_matrix[max_step][level + 1] = max_step;
+
+            }
+
+        }
+
     }
 }
- */
+*/
 
 template<class T>
 double Graph<T>::bruteForceTimesBetter(const T &origin) {
@@ -1495,6 +1631,88 @@ std::vector<T> Graph<T>::getOverlapClientsTravelling(const T &info) {
     }
     return overlap;
 }
+
+template<class T>
+std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(const T &info) {
+    std::vector<T> overlap;
+    Vertex<T> *vertex = findVertex(info);
+    if (vertex == nullptr) return overlap;
+    overlap.push_back(info);
+    unsigned sup_lim = vertex->hour + vertex->tolerance;
+    for (Vertex<T> *v : vertexSet) {
+        if (v->info != vertex->info && v->hour > 0 && v->max_tolerance > 0) {
+            Edge<T> *edge = findEdge(v->info, vertex->info);
+            double travelling_time = 0.0;
+            if (edge != nullptr) travelling_time = edge->cost;
+            if (v->hour + v->max_tolerance + visit_time + travelling_time < sup_lim) {
+                overlap.push_back(v->info);
+            }
+        }
+    }
+    return overlap;
+}
+
+
+template<class T>
+std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(std::vector<T> remaining_clients, const T &info){
+    std::vector<T> overlap;
+    Vertex<T> *vertex = findVertex(info);
+    if (vertex == nullptr) return overlap;
+    overlap.push_back(info);
+    unsigned sup_lim = vertex->hour + vertex->tolerance;
+    for (T vinfo : remaining_clients) {
+        Vertex<T> * v = findVertex(vinfo);
+        if (v != nullptr && v->info != vertex->info && v->hour > 0 && v->max_tolerance > 0) {
+            Edge<T> *edge = findEdge(v->info, vertex->info);
+            double travelling_time = 0.0;
+            if (edge != nullptr) travelling_time = edge->cost;
+            if (v->hour + v->max_tolerance + visit_time + travelling_time < sup_lim) {
+                overlap.push_back(v->info);
+            }
+        }
+    }
+    return overlap;
+}
+
+template<class T>
+std::vector<T> Graph<T>::getClusters(const T &origin){
+    Vertex<T> *orig = findVertex(origin);
+    if (orig == nullptr) {
+        std::cout << "[Clusters] Invalid origin!\n";
+        return;
+    }
+
+    /*
+    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> client_queue;
+    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> temp_queue;
+    std::vector<T> result;
+
+    for (Vertex<T> *v : vertexSet) {
+        if (v->info != origin){
+            client_queue.push(v);
+            //result.push_back(v->info);
+        }
+    }
+
+    temp_queue = client_queue;
+    T current_info;
+
+    while(!temp_queue.empty()){
+        current_info = temp_queue.pop();
+        if(temp_queue.empty()) break;
+        std::vector<T> temp_info;
+        temp_info.push_back(current_info);
+        int overlap_size = (getPerfectOverlapClientsTravelling(temp_info, temp_queue.top())).size() - 1;
+        if(overlap_size == 0){
+            result.push_back(current_info);
+        }
+    }
+
+    return result;
+     */
+}
+
+
 
 template<class T>
 std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravellingPtr(const Vertex<T>* info) {
