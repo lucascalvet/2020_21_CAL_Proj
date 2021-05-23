@@ -19,6 +19,9 @@ constexpr auto INF = std::numeric_limits<double>::max();
 constexpr auto UINF = std::numeric_limits<unsigned>::max();
 
 template<class T>
+class Cluster;
+
+template<class T>
 class Vertex;
 
 template<class T>
@@ -382,7 +385,9 @@ public:
     double costFunctionTotalPtr(const Vertex<T>* og, std::vector<Vertex<T>*> path);
 
     std::vector<T> getClusters(const T &origin);
-    
+
+    std::vector<T> dividingClusters(std::vector<int> vans, const T &origin);
+
 };
 
 template<class T>
@@ -827,7 +832,8 @@ public:
         for(T info : info_set){
             Vertex<T> * vertex = graph.findVertex(info);
             if(vertex != nullptr){
-                unsigned vertex_mh = vertex->getHour() + vertex->getTolerance() + graph.getVisitTime();
+                //unsigned vertex_mh = vertex->getHour() + vertex->getTolerance() + graph.getVisitTime();
+                unsigned vertex_mh = vertex->getHour() + vertex->getMaxTolerance() + graph.getVisitTime();
                 if(vertex_mh > maxHour){
                     maxHour = vertex_mh;
                     selected_vertex = vertex;
@@ -837,7 +843,22 @@ public:
         return std::pair<Vertex<T> *, unsigned>(selected_vertex, maxHour);
     };
 
+    Vertex<T> * getArrivalVertex(){
+        return getArrivalHour().first;
+    }
+
+    Vertex<T> * getDepartureVertex(){
+        return getDepartureHour().first;
+    }
+
+    unsigned getMaxArrivalHour(){
+        Vertex<T> *v = getArrivalHour().first;
+        return v->getHour() + v->getMaxTolerance();
+    }
+
     double calculateClusterCost(Cluster<T> otherCluster);
+
+    double calculateOriginCost(const T &origin, bool to_origin=false);
 
     void mergeCluster(Cluster<T> otherCluster);
 
@@ -862,15 +883,34 @@ template<class T>
 double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster){
     std::pair<Vertex<T> *, unsigned> departure = getDepartureHour();
     std::pair<Vertex<T> *, unsigned> arrival = otherCluster.getArrivalHour();
-    if(arrival.first == nullptr || departure.first == nullptr) return -1;
+    if(arrival.first == nullptr || departure.first == nullptr) return INF;
 
     Edge<T> * edge = graph.findEdge(departure.first->getInfo(), arrival.first->getInfo());
     if(edge == nullptr) return INF;
 
     double travelling_time = edge->getCost() / graph.getVelocity();
     if(departure.second + travelling_time <= arrival.second) return 0;
-    else if (departure.second + travelling_time > arrival.first->getHour() + arrival.first->getMaxTolerance()) return INF;
+    else if (departure.second + travelling_time > otherCluster.getMaxArrivalHour()) return INF;
     else return departure.second + travelling_time - arrival.second;
+}
+
+
+template<class T>
+double Cluster<T>::calculateOriginCost(const T &origin, bool to_origin){
+    if(to_origin){
+        Edge<T> * edge = graph.findEdge(getDepartureVertex()->info, origin);
+        if(edge == nullptr) return INF;
+        return edge->getCost();
+    }
+    else{
+        std::pair<Vertex<T> *, unsigned> arrival = getArrivalHour();
+        Edge<T> * edge = graph.findEdge(origin, arrival.first->getInfo());
+        if(edge == nullptr) return -1;
+        double delay = graph.getStartTime() + edge->getCost() - arrival.second;
+        if(delay < 0) return 0;
+        if(graph.getStartTime() + edge->getCost() > getMaxArrivalHour()) return INF;
+        return delay;
+    }
 }
 
 template<class T>
@@ -1690,36 +1730,87 @@ std::vector<T> Graph<T>::getClusters(const T &origin){
         return;
     }
 
-    /*
-    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> client_queue;
-    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> temp_queue;
-    std::vector<T> result;
+    std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompare<T>> cluster_queue;
+    //std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompare<T>> temp_queue;
+    std::vector<Cluster<T>> temp_clusters;
+    std::vector<Cluster<T>> result;
+    std::vector<T> temp;
 
     for (Vertex<T> *v : vertexSet) {
+        temp.clear();
         if (v->info != origin){
-            client_queue.push(v);
-            //result.push_back(v->info);
+            temp.push(v);
+            Cluster<T> cluster(this, temp);
+            cluster_queue.push(cluster);
         }
     }
 
-    temp_queue = client_queue;
-    T current_info;
+    Cluster<T> main_cluster = Cluster<T>(this, {});
 
-    while(!temp_queue.empty()){
-        current_info = temp_queue.pop();
-        if(temp_queue.empty()) break;
-        std::vector<T> temp_info;
-        temp_info.push_back(current_info);
-        int overlap_size = (getPerfectOverlapClientsTravelling(temp_info, temp_queue.top())).size() - 1;
-        if(overlap_size == 0){
-            result.push_back(current_info);
+    while(!cluster_queue.empty()){
+        temp_clusters.clear();
+        main_cluster = cluster_queue.pop();
+        while(!cluster_queue.empty()){
+            Cluster<T> other_cluster = cluster_queue.top();
+            if(main_cluster.calculateClusterCost(other_cluster) == 0){
+                main_cluster.mergeCluster(other_cluster);
+            }
+            else{
+                temp_clusters.push_back(other_cluster);
+            }
+            cluster_queue.pop();
         }
+        for(Cluster<T> c : temp_clusters) cluster_queue.push(c);
+        result.push_back(main_cluster);
     }
 
     return result;
-     */
 }
 
+//TODO: Make a Van class and implement it here! (Change VisitTime everywhere)
+template<class T>
+std::vector<std::pair<int, std::vector<Vertex<T> *>>> Graph<T>::dividingClusters(std::vector<int> vans, const T &origin){
+    std::vector<Cluster<T>> clusters = getClusters(origin);
+    unsigned vans_no = vans.size();
+    std::vector<Vertex<T> *> vertices;
+    std::vector<std::pair<int, std::vector<Vertex<T> *>>> result_pairs;
+
+    if(clusters.size() <= vans_no){
+        int vcounter = 0; //temporary. To be changed...
+        //TODO: Mut Priority Queue of Vans ordered by VisitTime
+        for(Cluster<T> cluster : clusters){
+            vertices.clear();
+            for(T info : cluster.getInfoSet()){
+                Vertex<T> * v = findVertex(info);
+                if(v != nullptr) vertices.push_back(v);
+            }
+            result_pairs.push_back(std::pair<int, std::vector<Vertex<T> *>>(vans[vcounter], vertices));
+        }
+    }
+    else{
+        std::vector<std::vector<double>> cost_matrix(clusters.size() + 1, std::vector<double>(clusters.size() + 1, INF));
+        for(int i = 0; i < clusters.size() + 1; i++){
+            if(i != 0){
+                cost_matrix[i][0] = clusters[i - 1].calculateOriginCost(origin, true);
+                cost_matrix[0][i] = clusters[i - 1].calculateOriginCost(origin);
+            }
+        }
+
+        for(int row = 1; row < clusters.size() + 1; row++){
+            for(int col = 1; col < clusters.size() + 1; col++){
+                cost_matrix[row][col] = clusters[row - 1].calculateClusterCost(clusters[col - 1]);
+            }
+        }
+
+        //TODO: Decide how to use cost_matrix between clusters to divide them in vans
+
+
+
+    }
+
+
+    return result_pairs;
+}
 
 
 template<class T>
