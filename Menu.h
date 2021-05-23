@@ -43,11 +43,11 @@ public:
     }
 
     string NomeFicheiro();
-    void ImprimeTit(string titulo);
-    void ImprimeOp(vector <string> opcoes, bool aviso, bool enm);
+    void printTitle(string titulo);
+    void printOp(vector <string> opcoes, bool aviso, bool enm);
 
     unsigned ProcessarInputInt(vector <string> opcoes, string titulo, unsigned liminf, unsigned limsup);
-    unsigned ProcessarInputInt(vector <string> opcoes, string titulo);
+    unsigned ProcessInputInt(vector <string> opcoes, string titulo);
 
     vector <int> ProcessarIntIndef(string colecao_sing, string colecao_plural, int lim);
     template<class T>
@@ -69,7 +69,7 @@ public:
     template<class T>
     int ProcessarInputProcura(string titulo, list <T> l);
 
-    void Inicial();
+    void Start();
 
     //void Importar();
     //void VerInfo();
@@ -78,7 +78,9 @@ public:
     //void Exportar();
     //void Outros();
 
-    void Principal();
+    void mainMenu();
+
+
 
 };
 

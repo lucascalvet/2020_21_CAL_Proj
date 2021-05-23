@@ -28,36 +28,36 @@ string Menu::NomeFicheiro(){
     return localizacao;
 }
 
-void Menu::ImprimeTit(string titulo) {
-    string uptitulo = titulo;
-    for (int i = 0; titulo.size() > i; i++){
-        uptitulo[i] = toupper(titulo[i]);
+void Menu::printTitle(string title) {
+    string uptitle = title;
+    for (int i = 0; title.size() > i; i++){
+        uptitle[i] = toupper(title[i]);
     }
-    cout << endl << endl << "|| " << uptitulo << " ||" << endl << endl;
+    cout << endl << endl << "|| " << uptitle << " ||" << endl << endl;
 }
 
-void Menu::ImprimeOp(vector <string> opcoes, bool aviso, bool enm) {
-    for(int i = 0; opcoes.size() > i; i++) {
-        if (opcoes.size() <= 10) cout << "[" << i << "] " << opcoes[i] << endl;
+void Menu::printOp(vector<string> options, bool warning, bool enm) {
+    for(int i = 0; options.size() > i; i++) {
+        if (options.size() <= 10) cout << "[" << i << "] " << options[i] << endl;
         else {
-            if (i <= 9) cout << "[0" << i << "] " << opcoes[i] << endl;
-            else cout << "[" << i << "] " << opcoes[i] << endl;
+            if (i <= 9) cout << "[0" << i << "] " << options[i] << endl;
+            else cout << "[" << i << "] " << options[i] << endl;
         }
     }
-    if(aviso) cout << "Input invalido. Insira um numero entre 0 e " << opcoes.size() - 1 << "." << endl;
-    if(!enm) cout << "Escolha: ";
+    if(warning) cout << "Invalid input. Input a number between 0 and " << options.size() - 1 << "." << endl;
+    if(!enm) cout << "Choose: ";
 }
 
 unsigned Menu::ProcessarInputInt(vector<string> opcoes, string titulo, unsigned liminf, unsigned limsup) {
     unsigned resposta;
-    ImprimeTit(titulo);
-    ImprimeOp(opcoes, false, false);
+    printTitle(titulo);
+    printOp(opcoes, false, false);
     cin >> resposta;
     while (cin.fail() || resposta < liminf || resposta > limsup){
         cin.clear();
         cin.ignore(1000, '\n');
-        ImprimeTit(titulo);
-        ImprimeOp(opcoes, true, false);
+        printTitle(titulo);
+        printOp(opcoes, true, false);
         cin >> resposta;
     }
     cin.clear();
@@ -65,21 +65,21 @@ unsigned Menu::ProcessarInputInt(vector<string> opcoes, string titulo, unsigned 
     return resposta;
 }
 
-unsigned Menu::ProcessarInputInt(vector<string> opcoes, string titulo) {
-    unsigned liminf = 0, limsup = opcoes.size() - 1, resposta;
-    ImprimeTit(titulo);
-    ImprimeOp(opcoes, false, false);
-    cin >> resposta;
-    while (cin.fail() || resposta < liminf || resposta > limsup){
+unsigned Menu::ProcessInputInt(vector<string> options, string title) {
+    unsigned liminf = 0, limsup = options.size() - 1, answer;
+    printTitle(title);
+    printOp(options, false, false);
+    cin >> answer;
+    while (cin.fail() || answer < liminf || answer > limsup){
         cin.clear();
         cin.ignore(1000, '\n');
-        ImprimeTit(titulo);
-        ImprimeOp(opcoes, true, false);
-        cin >> resposta;
+        printTitle(title);
+        printOp(options, true, false);
+        cin >> answer;
     }
     cin.clear();
     cin.ignore(1000, '\n');
-    return resposta;
+    return answer;
 }
 
 vector <int> Menu::ProcessarIntIndef(string colecao_sing, string colecao_plural, int lim) {
@@ -209,6 +209,30 @@ string Menu::InputNome(string texto) {
     return resposta;
 }
 
+void Menu::mainMenu() {
+    unsigned ans;
+    string title = "Welcome! \nWhere are you?";
+    vector<string> options = {"Porto", "Espinho", "Penafiel"};
+    ans = ProcessInputInt(options, title);
+    switch(ans) {
+        case 0:
+            //load porto stuff
+            break;
+        case 1:
+            //load Espinho stuff
+            break;
+        case 2:
+            //load Penafiel stuff
+            break;
+        case 99:
+            std::cout << std::endl << "Quitting..." << std::endl;
+            break;
+        default:
+            return mainMenu();
+    }
+
+    return mainMenu();
+}
 /*
 data Menu::InputData(string texto) {
     data resposta;
@@ -345,7 +369,7 @@ T Menu::EfetuarProcura(int id, list<T> l) {
 template<class T>
 int Menu::ProcessarInputProcura(string titulo, list<T> l) {
     int resposta;
-    ImprimeTit(titulo);
+    printTitle(titulo);
     PrintList(l);
     cout << "[-X] Voltar" << endl;
     cout << "[-1] Ver Info" << endl;
@@ -355,7 +379,7 @@ int Menu::ProcessarInputProcura(string titulo, list<T> l) {
     while(cin.fail() || resposta == -1 || (resposta >= 0 && !ProcuraValida(resposta, l))){
         cin.clear();
         cin.ignore(1000, '\n');
-        ImprimeTit(titulo);
+        printTitle(titulo);
         if(resposta == -1) PrintList(l);
         cout << "[-X] Voltar" << endl;
         cout << "[-1] Ver Info" << endl;
@@ -374,8 +398,8 @@ int Menu::ProcessarInputProcura(string titulo, list<T> l) {
     else return resposta;
 }
 
-void Menu::Inicial() {
-    return Principal();
+void Menu::Start() {
+    return mainMenu();
 }
 
 /*
@@ -758,6 +782,18 @@ void Menu::Apagar() {
  */
 
 /*
+void Menu::Exportar() {
+    string localizacao, titulo = "Exportar Hotel";
+    ImprimeTit(titulo);
+    cout << endl << "Introduza a Localizacao do Ficheiro para onde quer Exportar o Hotel: ";
+    cin >> localizacao;
+    H.EscreverHotel(localizacao);
+    return Principal();
+}
+ */
+
+
+/*
 void Menu::Outros() {
     string titulo = "Outros";
     vector<string> opcoes = {"Prestar Servico", "Promocoes", "Mudar Rating a Compra", "Escolher Produto", "Escolher Compra", "Fazer Pesquisas", "Voltar"};
@@ -977,50 +1013,5 @@ void Menu::Outros() {
     return Outros();
 }
  */
-
-/*
-void Menu::Exportar() {
-    string localizacao, titulo = "Exportar Hotel";
-    ImprimeTit(titulo);
-    cout << endl << "Introduza a Localizacao do Ficheiro para onde quer Exportar o Hotel: ";
-    cin >> localizacao;
-    H.EscreverHotel(localizacao);
-    return Principal();
-}
- */
-
-
-void Menu::Principal() {
-    unsigned resposta;
-    string titulo = "Bem-vindo";
-    vector <string> opcoes = {"Importar...", "Ver Informacao...", "Adicionar Membro...", "Apagar Membro...", "Reservar / Cancelar Reserva", "Gerir Funcionarios", "Check-in / Check-out", "Viajar", "Efetuar Compra", "Promocao Iniciais", "Financas", "Outros", "Exportar", "Sair"};
-    resposta = ProcessarInputInt(opcoes, titulo);
-    switch (resposta){
-        case 0:
-            //return Importar();
-            return Principal();
-        case 1:
-            //return VerInfo();
-            return Principal();
-        case 2:
-            //return Adicionar();
-            return Principal();
-        case 3:
-            //return Apagar();
-            return Principal();
-        case 4:
-            //return Exportar();
-            return Principal();
-        case 10:
-            //return Outros();
-            return Principal();
-        case 99:
-            cout << endl << "THE END" << endl;
-            return;
-        default:
-            return Principal();
-    }
-    return Principal();
-}
 
 
