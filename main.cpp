@@ -1,20 +1,27 @@
 #include <iostream>
 #include <ctime>
+#include <chrono>
 #include "Graph.h"
 #include "Menu.h"
+#include "Utils.h"
 
 using namespace std;
 
-template <class T>
-void VertexPrintInfo(Vertex<T> * v) {cout << "V" << v->getInfo();}
+template<class T>
+void VertexPrintInfo(Vertex<T> *v) { cout << "V" << v->getInfo(); }
 
-template <class T>
-void EdgePrintInfo(Edge<T> * e) {VertexPrintInfo(e->getOrigin()); cout << "--" << e->getCost() << "-->"; VertexPrintInfo(e->getDest()); cout << endl;}
+template<class T>
+void EdgePrintInfo(Edge<T> *e) {
+    VertexPrintInfo(e->getOrigin());
+    cout << "--" << e->getCost() << "-->";
+    VertexPrintInfo(e->getDest());
+    cout << endl;
+}
 
-template <class T>
+template<class T>
 void GraphPrintInfo(Graph<T> g) {
-    for(Vertex<T>* vertex : g.getVertexSet()){
-        for(Edge<T>* edge : vertex->getOutgoing()){
+    for (Vertex<T> *vertex : g.getVertexSet()) {
+        for (Edge<T> *edge : vertex->getOutgoing()) {
             EdgePrintInfo(edge);
         }
         /*
@@ -25,19 +32,18 @@ void GraphPrintInfo(Graph<T> g) {
     }
 }
 
-template <class T>
+template<class T>
 void PrintVector(vector<T> vec, string title) {
     cout << title << ": ";
-    for(int i = 0; i < vec.size(); i++){
+    for (int i = 0; i < vec.size(); i++) {
         cout << vec[i];
-        if(i < vec.size() - 1){
+        if (i < vec.size() - 1) {
             cout << ", ";
-        }
-        else cout << endl;
+        } else cout << endl;
     }
 }
 
-void importMap(Graph<unsigned>& map) {
+void importMap(Graph<unsigned> &map) {
     Menu map_menu("Carregar mapa");
     map_menu.pushOption("Porto");
     map_menu.pushOption("Espinho");
@@ -50,53 +56,91 @@ void importMap(Graph<unsigned>& map) {
     unsigned choice;
     choice = map_menu.chooseOption();
     switch (choice) {
-        case 0:
+        case 0: // Porto
             nodes_filename = "../resources/Porto/porto_strong_nodes_xy.txt";
             edges_filename = "../resources/Porto/porto_strong_edges.txt";
             break;
-        case 1:
+        case 1: // Espinho
             nodes_filename = "../resources/Espinho/espinho_strong_nodes_xy.txt";
             edges_filename = "../resources/Espinho/espinho_strong_edges.txt";
             break;
-        case 2:
-        case 3:
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "Ficheiro de vértices: ";
+        case 2: // Importar de ficheiro (x, y)
+        case 3: // Importar de ficheiro (lat, long)
+            cout << "Ficheiro de vertices: ";
             cin >> nodes_filename;
             while (cin.fail() || cin.peek() != '\n') {
+                cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                cout << "Input inválido! Insira um caminho de ficheiro válido.\n";
-                cout << "Caminho do ficheiro de vértices: ";
+                cout << "Input invalido! Insira um caminho de ficheiro valido.\n";
+                cout << "Caminho do ficheiro de vertices: ";
                 cin >> nodes_filename;
             }
-            cin.ignore(numeric_limits<streamsize>::max(), '\n');
             cout << "Ficheiro de arestas: ";
             cin >> edges_filename;
             while (cin.fail() || cin.peek() != '\n') {
+                cin.clear();
                 cin.ignore(numeric_limits<streamsize>::max(), '\n');
-                cout << "Input inválido! Insira um caminho de ficheiro válido".\n";
+                cout << "Input invalido! Insira um caminho de ficheiro valido.\n";
                 cout << "Caminho do ficheiro de arestas: ";
                 cin >> edges_filename;
             }
             break;
-        case 4:
+        case 4: // Voltar
             return;
         default:
             break;
     }
     if (choice == 3) lat_lng = true;
+    cout << "A importar mapa, pode demorar algum tempo...\n";
     map.importGraph(nodes_filename, edges_filename, lat_lng);
+    cout << "Mapa importado com sucesso.\n";
+}
+
+void calculateRoutes(unsigned bakery, Graph<unsigned> &ip_map) {
+    Menu route_menu("Calcular rotas");
+    route_menu.pushOption("Held-Karp (sem contagem de horas)");
+    route_menu.pushOption("Nearest Neighbour (sem contagem de horas)");
+    route_menu.pushOption("Nearest Neighbour (com contagem de horas)");
+    route_menu.pushOption("Brute Force (com contagem de horas)");
+    route_menu.pushOption("Voltar");
+    unsigned choice;
+    choice = route_menu.chooseOption();
+    if (choice != 4) {
+        cout << "A correr algoritmo...\n";
+    }
+    auto start = chrono::high_resolution_clock::now(); // Record start time
+    switch (choice) {
+        case 0: // Held-Karp (sem contagem de horas)
+            break;
+        case 1: // Nearest Neighbour (sem contagem de horas)
+            break;
+        case 2: // Nearest Neighbour (com contagem de horas)
+            break;
+        case 3: // Brute Force (com contagem de horas)
+            break;
+        case 4: // Voltar
+            break;
+    }
+    if (choice != 4) {
+        auto finish = std::chrono::high_resolution_clock::now(); // Record end time
+        std::chrono::duration<double> elapsed = finish - start;
+        cout << "Resultado obtido em " << elapsed.count() << "s.";
+    }
 }
 
 void mainMenu() {
-    Graph<unsigned> main_map;
+    Graph<unsigned> main_map = Graph<unsigned>();
+    Graph<unsigned> ip_map = Graph<unsigned>();
+    vector<unsigned> ids, ips;
+    bool modif = false;
+    unsigned bakery = UINF, client, time, hour, tolerance, max_tolerance;
     Menu main_menu("Menu principal");
     main_menu.pushOption("Carregar mapa");
     main_menu.pushOption("Visualizar mapa");
-    main_menu.pushOption("Definir padaria");
-    main_menu.pushOption("Definir clientes");
-    main_menu.pushOption("Alterar velocidade média");
-    main_menu.pushOption("Alterar velocidade média");
+    main_menu.pushOption("Definir padaria e propriedades");
+    main_menu.pushOption("Definir cliente");
+    main_menu.pushOption("Inserir impedimentos de transito");
+    main_menu.pushOption("Calcular rotas");
     main_menu.pushOption("Reset");
     main_menu.pushOption("Sair");
     unsigned choice;
@@ -104,24 +148,88 @@ void mainMenu() {
     while (!quit) {
         choice = main_menu.chooseOption();
         switch (choice) {
-            case 0:
+            case 0: // Carregar mapa
                 importMap(main_map);
                 break;
-            case 1:
-                main_map.viewGraph();
+            case 1: // Visualizar mapa
+                ips = ids;
+                if (bakery != UINF) ips.push_back(bakery);
+                if (modif) {
+                    cout << "A correr o algoritmo de Dijkstra para calcular os caminhos mais curtos entre os pontos de interesse...";
+                    ip_map = main_map.generateInterestPointsGraph(ips);
+                    cout << "Concluído.\n";
+                }
+                cout << "A abrir GraphViewer...\n";
+                main_map.viewGraphIP(ip_map);
                 break;
-            case 7:
+            case 2: // Definir padaria
+                bakery = getUnsigned("Indice da padaria");
+                while (main_map.findVertex(bakery) == nullptr) {
+                    cout << "Indice inexistente! Insira um índice existente.";
+                    bakery = getUnsigned("Indice da padaria");
+                }
+                time = getUnsigned("Velocidade media das carrinhas (km/h)");
+                main_map.setVelocity(time);
+                time = getUnsigned("Hora de saida da padaria (min desde as 0:00)");
+                main_map.setEarlyTime(time);
+                time = getUnsigned("Tempo permitido de antecedencia (min)");
+                main_map.setEarlyTime(time);
+                time = getUnsigned("Tempo de visita (min)");
+                main_map.setVisitTime(time);
+                modif = true;
+                break;
+            case 3: // Definir cliente
+                client = getUnsigned("Indice do cliente");
+                while (main_map.findVertex(bakery) == nullptr) {
+                    cout << "Indice inexistente! Insira um indice existente.";
+                    client = getUnsigned("Indice do cliente");
+                }
+                hour = getUnsigned("Hora pretendida de entrega (min desde as 0:00)");
+                tolerance = getUnsigned("Tolerancia de tempo (min)");
+                max_tolerance = getUnsigned("Tolerancia maxima de tempo (min)");
+                if (find(ids.begin(), ids.end(), client) == ids.end())
+                    ids.push_back(client);
+                main_map.findVertex(client)->setTimes(hour, tolerance, max_tolerance);
+                break;
+            case 4: // Inserir impedimentos de trânsito
+                // TODO: Implementar
+                break;
+            case 5: // Calcular rotas
+                if (bakery == UINF) {
+                    cout << "A Padaria nao esta definida!\n";
+                    stopConsole();
+                    break;
+                }
+                if (ids.empty()) {
+                    cout << "Nenhum cliente definido!\n";
+                    stopConsole();
+                    break;
+                }
+                ips = ids;
+                ips.push_back(bakery);
+                if (modif) {
+                    cout << "A correr o algoritmo de Dijkstra para calcular os caminhos mais curtos entre os pontos de interesse...";
+                    ip_map = main_map.generateInterestPointsGraph(ips);
+                    cout << "Concluído.\n";
+                }
+                calculateRoutes(bakery, ip_map);
+                break;
+            case 6: // Reset
+                break;
+            case 7: // Sair
                 quit = true;
+                break;
             default:
                 break;
         }
     }
 }
 
-int main(){
+int main() {
+    mainMenu();
+    return 0;
+
     cout << "Start" << endl;
-
-
 
     Graph<unsigned> g;
     Graph<unsigned> gg;
@@ -180,8 +288,7 @@ int main(){
     minig.heldKarp(11);
 
     cout << "Getting path..." << endl;
-    pair<vector<unsigned> , double> hk_path = minig.getPath(11, 11);
-
+    pair<vector<unsigned>, double> hk_path = minig.getPath(11, 11);
 
 
     cout << "GraphViewer..." << endl;
@@ -207,7 +314,7 @@ int main(){
     //minig.nearestNeighbour(11);
     minig.nearestNeighbourTimes(11);
     cout << "Getting path..." << endl;
-    pair<vector<unsigned> , double> nn_path = minig.getPath(11, 11);
+    pair<vector<unsigned>, double> nn_path = minig.getPath(11, 11);
 
     cout << "GraphViewer..." << endl;
     minig.viewGraphPath(nn_path.first, ids, true, true, true);
@@ -219,6 +326,6 @@ int main(){
 
     double dist = calculateDistHaversine(-8.577122, 41.172792, -8.616987, 41.150174);
     //double dist = calculateDistHaversine(41.172792, -8.577122, 41.150174, -8.616987);
-    double old_dist = calculateDist(6218.020297963754,-2100.583359242417, 1785.2345472782617,414.4234916046262);
+    double old_dist = calculateDist(6218.020297963754, -2100.583359242417, 1785.2345472782617, 414.4234916046262);
     cout << "XY DIST: " << old_dist << " vs LATLNG DIST: " << dist << endl;
 }

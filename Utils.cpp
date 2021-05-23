@@ -1,5 +1,8 @@
 #include "Utils.h"
 #include <cmath>
+#include <string>
+#include <iostream>
+#include <limits>
 
 using namespace std;
 #define EARTH_R 6371.0
@@ -19,4 +22,24 @@ double calculateDistHaversine(double long0, double lat0, double long1, double la
                cos(rad_lat0) * cos(rad_lat1);
     double dist_km = EARTH_R * 2 * asin(sqrt(trig));
     return dist_km * 1000.0;
+}
+
+void stopConsole() {
+    cout << endl; //formatting console
+    cout << "Press enter to continue...";
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
+
+unsigned getUnsigned(const string& question) {
+    unsigned choice;
+    cout << question << ": ";
+    cin >> choice;
+    while (cin.fail() || cin.peek() != '\n') {
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cout << "Valor inválido!\n";
+        cout << question << ": ";
+        cin >> choice;
+    }
+    return choice;
 }

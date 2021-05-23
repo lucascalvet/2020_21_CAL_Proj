@@ -1,6 +1,7 @@
 #include <iostream>
 #include <limits>
 #include "Menu.h"
+#include "Utils.h"
 
 using namespace std;
 
@@ -21,6 +22,7 @@ void Menu::printOptions() {
     for (int i = 0; i < title.size(); i++) {
         cout << "-";
     }
+    cout << endl;
     for (int i = 0; i < options.size(); i++) {
         cout << " " << i + 1 << ": " << options.at(i) << endl;
     }
@@ -28,15 +30,10 @@ void Menu::printOptions() {
 
 unsigned int Menu::chooseOption() {
     printOptions();
-    cout << "Escolha: ";
-    unsigned choice;
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    cin >> choice;
-    while (cin.fail() || cin.peek() != '\n' || choice < 1 || choice > options.size()) {
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "Escolha inválida! Insira um nº entre 1 e " << options.size() << ".\n";
-        cout << "Escolha: ";
-        cin >> choice;
+    unsigned choice = getUnsigned("Escolha");
+    while (choice < 1 || choice > options.size()) {
+        cout << "Escolha invalida! Insira um nº entre 1 e " << options.size() << ".\n";
+        choice = getUnsigned("Escolha");
     }
     return choice - 1;
 }
