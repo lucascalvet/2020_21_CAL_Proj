@@ -293,7 +293,9 @@ public:
 
     double bruteForceTimesBetter(const T &origin);
 
-    std::pair<double, std::vector<Vertex<T> *>> bruteForceTimesRec(const Vertex<T> * origin, std::priority_queue<Vertex<T> *> client_queue, std::vector<Vertex<T> *> path = std::vector<Vertex<T> *>());
+    std::pair<double, std::vector<Vertex<T> *>>
+    bruteForceTimesRec(const Vertex<T> *origin, std::priority_queue<Vertex<T> *> client_queue,
+                       std::vector<Vertex<T> *> path = std::vector<Vertex<T> *>());
 
     std::vector<std::vector<T>> dfsConnectivity() const;
 
@@ -367,7 +369,7 @@ public:
 
     std::vector<T> getOverlapClientsTravelling(const T &info);
 
-    std::vector<Vertex<T> *> getOverlapClientsTravellingPtr(const Vertex<T>* info);
+    std::vector<Vertex<T> *> getOverlapClientsTravellingPtr(const Vertex<T> *info);
 
     std::vector<T> getPerfectOverlapClientsTravelling(const T &info);
 
@@ -380,6 +382,7 @@ public:
     double costFunctionTotalPtr(const Vertex<T>* og, std::vector<Vertex<T>*> path);
 
     std::vector<T> getClusters(const T &origin);
+    
 };
 
 template<class T>
@@ -730,6 +733,7 @@ std::pair<std::vector<T>, double> Graph<T>::getPath(const T &origin, const T &de
 template<class T>
 Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) {
     Graph<T> result;
+    if (important_points.empty()) return result;
     result.visit_time = this->visit_time;
     result.early_time = this->early_time;
     result.start_time = this->start_time;
@@ -746,6 +750,8 @@ Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) 
         result.addVertex(important_points[i], v->getLat(), v->getLng(), v->getHour(), v->getTolerance(),
                          v->getMaxTolerance(), v->getQuantity());
     }
+
+    if (important_points.size() == 1) return result;
     for (int i = 0; i < important_points.size(); i++) {
         T current_info = important_points[i];
         //Graph<T> copy = complete_graph;
@@ -1154,19 +1160,21 @@ double Graph<T>::bruteForceTimesBetter(const T &origin) {
     if (path.size() > 0)
         res.second.at(0)->path = orig;
     for (int i = 1; i < path.size(); i++) {
-        path.at(i)->path = path.at(i-1); //TODO: NOT FILLING DISTS (should we?)
+        path.at(i)->path = path.at(i - 1); //TODO: NOT FILLING DISTS (should we?)
     }
-    orig->path = path.at(path.size()-1);
+    orig->path = path.at(path.size() - 1);
 
     return res.first;
 }
 
 template<class T>
-std::pair<double, std::vector<Vertex<T> *>> Graph<T>::bruteForceTimesRec(const Vertex<T> * origin, std::priority_queue<Vertex<T> *> client_queue, std::vector<Vertex<T> *> path) {
+std::pair<double, std::vector<Vertex<T> *>>
+Graph<T>::bruteForceTimesRec(const Vertex<T> *origin, std::priority_queue<Vertex<T> *> client_queue,
+                             std::vector<Vertex<T> *> path) {
     if (client_queue.empty())
         return std::pair<double, std::vector<Vertex<T> *>>(costFunctionTotalPtr(origin, path));
-    Vertex<T> * next_min = client_queue.top();
-    Vertex<T> * overlapping = getOverlapClientsTravellingPtr(next_min);
+    Vertex<T> *next_min = client_queue.top();
+    Vertex<T> *overlapping = getOverlapClientsTravellingPtr(next_min);
     std::vector<Vertex<T> *> temp_clients;
     std::vector<Vertex<T> *> temp_path;
     std::priority_queue<Vertex<T> *> temp_queue;
@@ -1840,7 +1848,7 @@ double Graph<T>::costFunctionTotal(T og, std::vector<T> path, double weight) {
 }
 
 template<class T>
-double Graph<T>::costFunctionTotalPtr(const Vertex<T>* origin, std::vector<Vertex<T>*> path) {
+double Graph<T>::costFunctionTotalPtr(const Vertex<T> *origin, std::vector<Vertex<T> *> path) {
     if (weight < 0 || weight > 1) return -1;
     if (path.size() == 0) return -1;
 
@@ -1853,8 +1861,8 @@ double Graph<T>::costFunctionTotalPtr(const Vertex<T>* origin, std::vector<Verte
     double average; //f
     double deviation; //g
 
-    Vertex<T>* first;
-    Vertex<T>* second;
+    Vertex<T> *first;
+    Vertex<T> *second;
     Edge<T> *edge;
     Vertex<T> *current_v;
 
