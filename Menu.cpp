@@ -32,7 +32,7 @@ unsigned int Menu::chooseOption() {
     printOptions();
     unsigned choice = getUnsigned("Escolha");
     while (choice < 1 || choice > options.size()) {
-        cout << "Escolha invalida! Insira um nº entre 1 e " << options.size() << ".\n";
+        cout << "Escolha invalida! Insira um nr entre 1 e " << options.size() << ".\n";
         choice = getUnsigned("Escolha");
     }
     return choice - 1;

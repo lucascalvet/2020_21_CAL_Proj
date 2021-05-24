@@ -146,6 +146,8 @@ public:
         this->max_tolerance = max_tolerance;
     }
 
+    void removeEdge(Edge<T> *e);
+
     friend class Graph<T>;
 
     friend class MutablePriorityQueue<Vertex<T>>;
@@ -170,6 +172,34 @@ void Vertex<T>::addEdge(Edge<T> *e) {
     outgoing.push_back(e);
     e->dest->incoming.push_back(e);
     e->dest->adj.push_back(e);
+}
+
+/**
+ * Remove outgoing edge from a vertex
+ *
+ * @param e pointer to the edge to be removed
+ */
+template<class T>
+void Vertex<T>::removeEdge(Edge<T> *e) {
+    for (auto edge = adj.begin(); edge < adj.end(); edge++) {
+        if (*edge == e) {
+            adj.erase(edge);
+            break;
+        }
+    }
+    for (auto edge = outgoing.begin(); edge < outgoing.end(); edge++) {
+        if (*edge == e) {
+            outgoing.erase(edge);
+            break;
+        }
+    }
+    for (auto edge = e->dest->incoming.begin(); edge < e->dest->incoming.end(); edge++) {
+        if (*edge == e) {
+            e->dest->incoming.erase(edge);
+            break;
+        }
+    }
+    delete e;
 }
 
 /**
@@ -280,7 +310,7 @@ template<class T>
 class ClientCompare {
 public:
     bool operator()(const Vertex<T> *v1, const Vertex<T> *v2) {
-        return v1->getHour() + v1->getMaxTolerance() < v2->getHour() + v2->getMaxTolerance();;
+        return v1->getHour() + v1->getMaxTolerance() > v2->getHour() + v2->getMaxTolerance();;
     }
 };
 
@@ -305,6 +335,8 @@ private:
     unsigned velocity = 50;
 
 public:
+    //~Graph();
+
     void nearestNeighbour(const T &origin_info);
 
     void nearestNeighbourTimes(const T &origin_info);
@@ -383,7 +415,7 @@ public:
 
     void viewGraph();
 
-    void viewGraphIP(Graph<T> igraph);
+    void viewGraphIP(const Graph<T> &igraph);
 
     void viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool remove_extra_nodes = false,
                        bool remove_extra_edges = false, bool show_w = false, bool show_nid = false);
@@ -399,15 +431,15 @@ public:
 
     std::vector<T> getOverlapClientsTravelling(const T &info);
 
-    std::vector<Vertex<T> *> getOverlapClientsTravellingPtr(Vertex<T> *info);
+    std::vector<Vertex<T> *> getOverlapClientsTravelling(Vertex<T> *info);
 
     std::vector<T> getPerfectOverlapClientsTravelling(const T &info);
 
     std::vector<T> getPerfectOverlapClientsTravelling(std::vector<T> remaining_clients, const T &info);
 
-    double costFunctionStep(T og, std::vector<T> path, T new_element, double weight);
+    double costFunctionStep(T og, std::vector<T> path, T new_element);
 
-    double costFunctionTotal(T og, std::vector<T> path, double weight);
+    double costFunctionTotal(T og, std::vector<T> path);
 
     double costFunctionTotal(Vertex<T> *og, std::vector<Vertex<T> *> path);
 
@@ -419,6 +451,18 @@ public:
     dividingClustersGreedy(std::vector<Van> vans, const T &origin);
 
 };
+
+/*
+template<class T>
+Graph<T>::~Graph() {
+    for (auto v : vertexSet) {
+        for (auto out : v->outgoing) {
+            delete out;
+        }
+        delete v;
+    }
+}
+ */
 
 template<class T>
 Vertex<T> *Graph<T>::addVertex(const T &in) {
@@ -917,7 +961,7 @@ double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster) {
     std::pair<Vertex<T> *, unsigned> arrival = otherCluster.getArrivalHour();
     if (arrival.first == nullptr || departure.first == nullptr) return INF;
 
-    Edge<T> *edge = graph.findEdge(departure.first->getInfo(), arrival.first->getInfo());
+    Edge<T> *edge = graph.findEdge(departure.first, arrival.first); //TODO: removed getInfo()
     if (edge == nullptr) return INF;
 
     double travelling_time = edge->getCost() / graph.getVelocity();
@@ -989,7 +1033,7 @@ void Graph<T>::heldKarp(const T &origin) {
                                             std::vector<unsigned>(vertices.size(), UINT_MAX));
     unsigned temp_dist;
     //Iterate through combinations of vertices encoded in bits
-    for (unsigned visited = 1; visited < (1 << vertices.size() - 1); visited++) {
+    for (unsigned visited = 1; visited < (1 << (vertices.size() - 1)); visited++) {
         //Iterate through the possible last vertices in a path
         for (unsigned last = 0; last < vertices.size() - 1; last++) {
             //The last vertices for a certain visited combination need to be part of that combination
@@ -1060,12 +1104,15 @@ double Graph<T>::bruteForceTimes(const T &origin) {
 
     std::pair<double, std::vector<Vertex<T> *>> res = bruteForceTimesRec(orig, client_queue, path);
 
+    if (res.first == INF) return res.first;
+
     path = res.second;
     if (path.size() > 0)
         res.second.at(0)->path = orig;
     for (int i = 1; i < path.size(); i++) {
         path.at(i)->path = path.at(i - 1);
     }
+    if (path.size() > 0)
     orig->path = path.at(path.size() - 1);
 
     unsigned current_time = start_time;
@@ -1109,7 +1156,7 @@ Graph<T>::bruteForceTimesRec(Vertex<T> *origin,
     if (client_queue.empty())
         return std::pair<double, std::vector<Vertex<T> *>>(costFunctionTotal(origin, path), path);
     Vertex<T> *next_min = client_queue.top();
-    std::vector<Vertex<T> *> overlapping = getOverlapClientsTravellingPtr(next_min);
+    std::vector<Vertex<T> *> overlapping = getOverlapClientsTravelling(next_min);
     std::vector<Vertex<T> *> temp_clients;
     std::vector<Vertex<T> *> temp_path;
     std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> temp_queue;
@@ -1117,16 +1164,20 @@ Graph<T>::bruteForceTimesRec(Vertex<T> *origin,
     std::vector<Vertex<T> *> min_path;
     std::pair<double, std::vector<Vertex<T> *>> res;
 
+    temp_path = path;
+
     for (auto client : overlapping) {
         temp_clients.clear();
-        temp_path = path;
         temp_path.push_back(client);
         temp_queue = client_queue;
         while (!temp_queue.empty() && temp_queue.top() != client) {
             temp_clients.push_back(temp_queue.top());
             temp_queue.pop();
         }
-        if (temp_queue.empty()) continue;
+        if (temp_queue.empty()) {
+            temp_path.pop_back();
+            continue;
+        }
         temp_queue.pop();
         for (auto c : temp_clients) {
             temp_queue.push(c);
@@ -1136,6 +1187,7 @@ Graph<T>::bruteForceTimesRec(Vertex<T> *origin,
             min_cost = res.first;
             min_path = res.second;
         }
+        temp_path.pop_back();
     }
 
     return std::pair<double, std::vector<Vertex<T> *>>(min_cost, min_path);
@@ -1221,6 +1273,7 @@ void Graph<T>::nearestNeighbourTimes(const T &origin_info) {
     }
 }
 
+//TODO: I think we should change this to a constructor. Or else it just adds on top of the current map...
 template<class T>
 void Graph<T>::importGraph(std::string vertex_filename, std::string edges_filename, bool lat_lng) {
     std::ifstream vertex_file(vertex_filename);
@@ -1292,7 +1345,7 @@ void Graph<T>::viewGraph() {
 }
 
 template<class T>
-void Graph<T>::viewGraphIP(Graph<T> igraph) {
+void Graph<T>::viewGraphIP(const Graph<T> &igraph) {
     // Instantiate GraphViewer
     GraphViewer gv;
 
@@ -1524,7 +1577,7 @@ template<class T>
 void Graph<T>::printTimes() {
     for (auto vertex : vertexSet) {
         if (vertex->hour > 0) {
-            unsigned delta_time = vertex->visited_at - vertex->hour;
+            int delta_time = vertex->visited_at - vertex->hour;
             std::cout << "V" << vertex->info << ": tol= " << vertex->tolerance << " | hour= " << vertex->hour
                       << " | visited_at= " << vertex->visited_at
                       << " | delta= " << delta_time << std::endl;
@@ -1558,19 +1611,9 @@ std::vector<T> Graph<T>::getOverlapClientsTravelling(const T &info) {
     std::vector<T> overlap;
     Vertex<T> *vertex = findVertex(info);
     if (vertex == nullptr) return overlap;
-    overlap.push_back(info);
-    unsigned inf_lim = vertex->hour - early_time;
-    unsigned sup_lim = vertex->hour + vertex->max_tolerance;
-    for (Vertex<T> *v : vertexSet) {
-        if (v->info != vertex->info && v->hour > 0 && v->max_tolerance > 0) {
-            Edge<T> *edge = findEdge(v->info, vertex->info);
-            double travelling_time = 0.0;
-            if (edge != nullptr) travelling_time = edge->cost;
-            if ((v->hour >= vertex->hour && v->hour - early_time + visit_time + travelling_time < sup_lim) ||
-                (v->hour <= vertex->hour && v->hour + v->max_tolerance + visit_time + travelling_time > inf_lim)) {
-                overlap.push_back(v->info);
-            }
-        }
+    std::vector<Vertex<T>*> res = getOverlapClientsTravelling(vertex);
+    for (auto v : res) {
+        overlap.push_back(v->info);
     }
     return overlap;
 }
@@ -1584,9 +1627,9 @@ std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(const T &info) {
     unsigned sup_lim = vertex->hour + vertex->tolerance;
     for (Vertex<T> *v : vertexSet) {
         if (v->info != vertex->info && v->hour > 0 && v->max_tolerance > 0) {
-            Edge<T> *edge = findEdge(v->info, vertex->info);
+            Edge<T> *edge = findEdge(v, vertex);
             double travelling_time = 0.0;
-            if (edge != nullptr) travelling_time = edge->cost;
+            if (edge != nullptr) travelling_time = edge->cost / velocity;
             if (v->hour + v->max_tolerance + visit_time + travelling_time < sup_lim) {
                 overlap.push_back(v->info);
             }
@@ -1606,9 +1649,9 @@ std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(std::vector<T> remai
     for (T vinfo : remaining_clients) {
         Vertex<T> *v = findVertex(vinfo);
         if (v != nullptr && v->info != vertex->info && v->hour > 0 && v->max_tolerance > 0) {
-            Edge<T> *edge = findEdge(v->info, vertex->info);
+            Edge<T> *edge = findEdge(v, vertex); //TODO: also changed here
             double travelling_time = 0.0;
-            if (edge != nullptr) travelling_time = edge->cost;
+            if (edge != nullptr) travelling_time = edge->cost / velocity; //TODO: confirm velocity
             if (v->hour + v->max_tolerance + visit_time + travelling_time < sup_lim) {
                 overlap.push_back(v->info);
             }
@@ -1853,7 +1896,7 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
 
 
 template<class T>
-std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravellingPtr(Vertex<T> *info) {
+std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravelling(Vertex<T> *info) {
     std::vector<Vertex<T> *> overlap;
     if (info == nullptr) return overlap;
     overlap.push_back(info);
@@ -1861,9 +1904,9 @@ std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravellingPtr(Vertex<T> *inf
     unsigned sup_lim = info->hour + info->max_tolerance;
     for (Vertex<T> *v : vertexSet) {
         if (v->info != info->info && v->hour > 0 && v->max_tolerance > 0) {
-            Edge<T> *edge = findEdge(v->info, info->info);
+            Edge<T> *edge = findEdge(v, info);
             double travelling_time = 0.0;
-            if (edge != nullptr) travelling_time = edge->cost;
+            if (edge != nullptr) travelling_time = edge->cost / velocity;
             if ((v->hour >= info->hour && v->hour - early_time + visit_time + travelling_time < sup_lim) ||
                 (v->hour <= info->hour && v->hour + v->max_tolerance + visit_time + travelling_time > inf_lim)) {
                 overlap.push_back(v);
@@ -1875,7 +1918,7 @@ std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravellingPtr(Vertex<T> *inf
 
 
 template<class T>
-double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element, double weight) {
+double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element) {
     if (weight < 0 || weight > 1) return -1;
 
     unsigned current_time = start_time;
@@ -1910,7 +1953,7 @@ double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element, doub
         else current_time += edge->cost / velocity + visit_time;
     }
     if (path.size() > 0) edge = findEdge(path[path.size() - 1], new_vertex->info);
-    else edge = findEdge(origin->info, new_vertex->info);
+    else edge = findEdge(origin, new_vertex);
     if (edge == nullptr) return -1;
     delay = (current_time + edge->cost / velocity) - new_vertex->hour;
     if (delay < new_vertex->tolerance) delay = 0;
@@ -1926,7 +1969,7 @@ double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element, doub
 
 
 template<class T>
-double Graph<T>::costFunctionTotal(T og, std::vector<T> path, double weight) {
+double Graph<T>::costFunctionTotal(T og, std::vector<T> path) {
 
     Vertex<T> *origin = findVertex(og);
     std::vector<Vertex<T> *> ptr_path;
@@ -1944,7 +1987,7 @@ double Graph<T>::costFunctionTotal(Vertex<T> *origin, std::vector<Vertex<T> *> p
     std::vector<unsigned> delays;
 
     unsigned current_time = start_time;
-    unsigned delay = 0;
+    double delay = 0;
     double total_delay = 0;
 
     double average; //f
@@ -1961,7 +2004,7 @@ double Graph<T>::costFunctionTotal(Vertex<T> *origin, std::vector<Vertex<T> *> p
         if (i == 0) first = origin;
         else first = path[i - 1];
         second = path[i];
-        edge = findEdge(first->info, second->info);
+        edge = findEdge(first, second);
         current_v = second;
         if (edge == nullptr || current_v == nullptr) return -1;
         delay = (current_time + edge->cost / velocity) - current_v->hour;

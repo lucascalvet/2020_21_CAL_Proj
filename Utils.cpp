@@ -26,7 +26,7 @@ double calculateDistHaversine(double long0, double lat0, double long1, double la
 
 void stopConsole() {
     cout << endl; //formatting console
-    cout << "Press enter to continue...";
+    cout << "Prima enter para continuar...";
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
@@ -37,9 +37,10 @@ unsigned getUnsigned(const string& question) {
     while (cin.fail() || cin.peek() != '\n') {
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        cout << "Valor inválido!\n";
+        cout << "Valor invalido!\n";
         cout << question << ": ";
         cin >> choice;
     }
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     return choice;
 }
