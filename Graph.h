@@ -18,7 +18,7 @@
 
 constexpr auto INF = std::numeric_limits<double>::max();
 constexpr auto UINF = std::numeric_limits<unsigned>::max();
-constexpr double LATLNG_FACTOR = 50000.0;
+constexpr double LATLNG_FACTOR = 100000.0;
 
 class Van;
 
@@ -308,10 +308,13 @@ template<class T>
 Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, bool lat_long):
         orig(o), dest(d) {
     if (lat_long)
-        cost = calculateDist(this->orig->getLng(), this->orig->getLat(), this->dest->getLng(), this->dest->getLat());
+        cost = calculateDistHaversine(this->orig->getLng(), this->orig->getLat(), this->dest->getLng(), this->dest->getLat());
     else cost = calculateDist(this->orig->getLat(), this->orig->getLng(), this->dest->getLat(), this->dest->getLng());
 }
 
+/**
+ * For priority queues, compare clients by time
+ */
 template<class T>
 class ClientCompare {
 public:
@@ -320,6 +323,9 @@ public:
     }
 };
 
+/**
+ * For priority queues, compare clients by time
+ */
 template<class T>
 class ClientArrivalCompare {
 public:
@@ -350,8 +356,6 @@ private:
     unsigned velocity = 50;
 
 public:
-    //~Graph();
-
     void nearestNeighbour(const T &origin_info);
 
     void nearestNeighbourTimes(const T &origin_info);
@@ -408,15 +412,11 @@ public:
 
     Vertex<T> *addVertex(const T &in);
 
-    //Vertex<T> *addVertex(const T &in, const double &x, const double &y);
-
     Vertex<T> *addVertex(const T &in, const double &lat, const double &lng, const unsigned &quantity = 0);
 
     Vertex<T> *
     addVertex(const T &in, const double &lat, const double &lng, const unsigned &hour, const unsigned &tolerance,
               const unsigned &max_tolerance, const unsigned &quantity = 0);
-
-    //Vertex<T> *addVertex(const T &in, const double &x, const double &y, const unsigned &hour, const unsigned &tolerance, const unsigned &max_tolerance);
 
     Edge<T> *addEdge(const T &sourc, const T &dest, double capacity, double cost, double flow = 0);
 
@@ -462,6 +462,8 @@ public:
 
     double costFunctionTotal(Vertex<T> *og, std::vector<Vertex<T> *> path);
 
+    double costFunctionTotal(Vertex<T> *origin, unsigned visit_time, std::vector<Vertex<T> *> path, bool max_tolreance_cap);
+
     std::vector<Cluster<T>> getClusters(const T &origin);
 
     std::vector<std::pair<Van, std::vector<Vertex<T> *>>> dividingClustersBrute(std::vector<Van> vans, const T &origin);
@@ -473,19 +475,9 @@ public:
 
     std::vector<T> vanPathtoViewPath(std::vector<std::pair<Van, std::vector<Vertex<T > *>>> van_path, const T &og);
 
+    double costFuntionMultipleVans(std::vector<std::pair<Van, std::vector<Vertex<T > *>>> van_path, const T &og);
 };
 
-/*
-template<class T>
-Graph<T>::~Graph() {
-    for (auto v : vertexSet) {
-        for (auto out : v->outgoing) {
-            delete out;
-        }
-        delete v;
-    }
-}
- */
 
 template<class T>
 Vertex<T> *Graph<T>::addVertex(const T &in) {
@@ -497,18 +489,6 @@ Vertex<T> *Graph<T>::addVertex(const T &in) {
     return v;
 }
 
-/*
-template<class T>
-Vertex<T> *Graph<T>::addVertex(const T &in, const double &x, const double &y) {
-    Vertex<T> *v = findVertex(in);
-    if (v != nullptr)
-        return v;
-    v = new Vertex<T>(in, x, y);
-    vertexSet.push_back(v);
-    return v;
-}
- */
-
 template<class T>
 Vertex<T> *Graph<T>::addVertex(const T &in, const double &lat, const double &lng, const unsigned &quantity) {
     Vertex<T> *v = findVertex(in);
@@ -519,18 +499,18 @@ Vertex<T> *Graph<T>::addVertex(const T &in, const double &lat, const double &lng
     return v;
 }
 
-/*
-template<class T>
-Vertex<T> *Graph<T>::addVertex(const T &in, const double &x, const double &y, const unsigned &hour, const unsigned &tolerance, const unsigned &max_tolerance){
-    Vertex<T> *v = findVertex(in);
-    if (v != nullptr)
-        return v;
-    v = new Vertex<T>(in, x, y, hour, tolerance, max_tolerance);
-    vertexSet.push_back(v);
-    return v;
-}
+/**
+ * Add a vertex to the graph
+ *
+ * @param in vertex id
+ * @param lat vertex lat (or x)
+ * @param lng vertex lng (or y)
+ * @param hour client hour of delivery
+ * @param tolerance client tolerance for delivery
+ * @param max_tolerance client maximum tolerance for delivery
+ * @param quantity the quantity of the delivery
+ * @return
  */
-
 template<class T>
 Vertex<T> *
 Graph<T>::addVertex(const T &in, const double &lat, const double &lng, const unsigned &hour, const unsigned &tolerance,
@@ -542,7 +522,6 @@ Graph<T>::addVertex(const T &in, const double &lat, const double &lng, const uns
     vertexSet.push_back(v);
     return v;
 }
-
 
 template<class T>
 Edge<T> *Graph<T>::addEdge(const T &sourc, const T &dest, double capacity, double cost, double flow) {
@@ -774,17 +753,19 @@ std::pair<std::vector<T>, double> Graph<T>::getPath(const T &origin, const T &de
 template<class T>
 Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) {
     Graph<T> result;
+
     if (important_points.empty()) return result;
     result.visit_time = this->visit_time;
     result.early_time = this->early_time;
     result.start_time = this->start_time;
     result.velocity = this->velocity;
-    std::cout << "Checking Con..." << std::endl;
+    result.latLng = this->latLng;
+    std::cout << "Checking Connectivity..." << std::endl;
     if (!checkConectivity(important_points)) {
-        std::cout << "Conectivity Invalid!!!" << std::endl;
+        std::cout << "Connectivity Invalid!!!" << std::endl;
         return result;
     }
-    std::cout << "Con Good!" << std::endl;
+    std::cout << "Connectivity Good!" << std::endl;
 
     for (int i = 0; i < important_points.size(); i++) {
         Vertex<T> *v = findVertex(important_points[i]);
@@ -1017,16 +998,10 @@ double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster) {
     std::pair<Vertex<T> *, unsigned> arrival = otherCluster.getArrivalHour();
     if (arrival.first == nullptr || departure.first == nullptr) return INF;
 
-    std::cout << "d->" << departure.second << " vs a->" << arrival.second << std::endl;
-
     Edge<T> *edge = graph->findEdge(departure.first, arrival.first); //TODO: removed getInfo()
     if (edge == nullptr) return INF;
 
     double travelling_time = edge->getCost() / graph->getVelocity();
-
-    std::cout << "d+t->" << departure.second + travelling_time << " vs(<= 0) a->" << arrival.second << std::endl;
-    std::cout << "d+t->" << departure.second + travelling_time << " vs(> INF) max_a->" << otherCluster.getMaxArrivalHour() << std::endl;
-    std::cout << "return delay->" << departure.second + travelling_time - arrival.second << std::endl;
 
     if (departure.second + travelling_time <= arrival.second) return 0;
     else if (departure.second + travelling_time > otherCluster.getMaxArrivalHour()) return INF;
@@ -1279,7 +1254,7 @@ void Graph<T>::nearestNeighbour(const T &origin_info) {
         }
         nextVertex->visited = true;
         nextVertex->dist = minWeight;
-        std::cout << "Dist from " << adj.at(0)->orig->info << " to " << nextVertex->info << ": " << minWeight << "\n";
+        std::cout << "[Nearest Neighbour] Dist from " << adj.at(0)->orig->info << " to " << nextVertex->info << ": " << minWeight << "\n";
         nextVertex->path = adj.at(0)->orig;
     }
     origin->path = nextVertex;
@@ -1656,7 +1631,9 @@ void Graph<T>::viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool remove
     for (int i = 0; i < path.size() - 1; i++) {
         Edge<T> *edge = igraph.findEdge(path[i], path[i + 1]);
         for (auto id : edge->complex_path) {
-            if (real_path.empty() || real_path[real_path.size() - 1] != id) real_path.push_back(id);
+            if (real_path.empty() || real_path[real_path.size() - 1] != id){
+                real_path.push_back(id);
+            }
         }
     }
 
@@ -1890,11 +1867,8 @@ public:
 template<class T>
 std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
 Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
-    std::cout << "Starting dividingClustersBrute..." << std::endl;
-    std::cout << "Getting Clusters..." << std::endl;
     std::vector<Cluster<T>> clusters = getClusters(origin);
     std::vector<Vertex<T> *> vertices;
-    std::cout << "Brute Clusters:" << std::endl;
     for(Cluster<T> c : clusters){
         c.PrintInfo();
     }
@@ -1922,7 +1896,7 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
     std::vector<std::pair<Van, std::vector<Vertex<T> *>>> result_pairs;
 
     if (clusters.size() > vans_no) {
-        std::cout << "[Brute] More Clusters than Vans..." << std::endl;
+        std::cout << "[BruteClusters] More Clusters than Vans..." << std::endl;
         /*
         std::vector<std::vector<double>> cost_matrix(clusters.size() + 1, std::vector<double>(clusters.size() + 1, INF));
         for(int i = 0; i < clusters.size() + 1; i++){
@@ -2021,7 +1995,7 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
         }
 
     } else {
-        std::cout << "[Brute] Less Clusters than Vans..." << std::endl;
+        std::cout << "[BruteCluster] Less Clusters than Vans..." << std::endl;
         final_clusters = clusters;
     }
 
@@ -2058,11 +2032,8 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
 template<class T>
 std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
 Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
-    std::cout << "Starting dividingClustersGreedy..." << std::endl;
-    std::cout << "Getting Clusters..." << std::endl;
     std::vector<Cluster<T>> clusters = getClusters(origin);
     std::vector<Vertex<T> *> vertices;
-    std::cout << "Greedy Clusters:" << std::endl;
     for(Cluster<T> c : clusters){
         c.PrintInfo();
     }
@@ -2090,7 +2061,7 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
     std::vector<std::pair<Van, std::vector<Vertex<T> *>>> result_pairs;
 
     if (clusters.size() > vans_no) {
-        std::cout << "[Greedy] More Clusters than Vans..." << std::endl;
+        std::cout << "[GreedyCluster] More Clusters than Vans..." << std::endl;
         std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareArrival<T>> arrival_cluster_queue;
         std::vector<Cluster<T>> van_clusters(vans_no, Cluster<T>(this, {}));
         for(int i = 0; i < clusters.size(); i++){
@@ -2107,7 +2078,7 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
         }
         final_clusters = van_clusters;
     } else {
-        std::cout << "[Greedy] Less Clusters than Vans..." << std::endl;
+        std::cout << "[GreedyCluster] Less Clusters than Vans..." << std::endl;
         final_clusters = clusters;
     }
 
@@ -2140,7 +2111,6 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
     return result_pairs;
 }
 
-
 template<class T>
 std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravelling(Vertex<T> *info) {
     std::vector<Vertex<T> *> overlap;
@@ -2161,7 +2131,6 @@ std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravelling(Vertex<T> *info) 
     }
     return overlap;
 }
-
 
 template<class T>
 double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element) {
@@ -2213,7 +2182,6 @@ double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element) {
     return cost;
 }
 
-
 template<class T>
 double Graph<T>::costFunctionTotal(T og, std::vector<T> path) {
 
@@ -2230,7 +2198,7 @@ double Graph<T>::costFunctionTotal(Vertex<T> *origin, std::vector<Vertex<T> *> p
     if (weight < 0 || weight > 1) return -1;
     if (path.size() == 0) return -1;
 
-    std::vector<unsigned> delays;
+    std::vector<double> delays;
 
     unsigned current_time = start_time;
     double delay = 0;
@@ -2256,6 +2224,57 @@ double Graph<T>::costFunctionTotal(Vertex<T> *origin, std::vector<Vertex<T> *> p
         delay = (current_time + edge->cost / velocity) - current_v->hour;
         if (delay < current_v->tolerance) delay = 0;
         if (delay > current_v->max_tolerance) return INF;
+        delays.push_back(delay);
+        total_delay += delay;
+        if (current_time + edge->cost / velocity < current_v->hour - early_time)
+            current_time = current_v->hour - early_time + visit_time;
+        else current_time += edge->cost / velocity + visit_time;
+    }
+
+    double vertex_no = path.size();
+    average = total_delay / vertex_no;
+
+    double deviation_sum = 0;
+    for (int i = 0; i < delays.size(); i++) {
+        deviation_sum += pow(delays[i] - average, 2);
+    }
+    deviation = sqrt((1 / vertex_no) * deviation_sum);
+
+    double cost = weight * average + (1 - weight) * deviation;
+    return cost;
+}
+
+template<class T>
+double Graph<T>::costFunctionTotal(Vertex<T> *origin, unsigned visit_time, std::vector<Vertex<T> *> path, bool max_tolreance_cap) {
+    if (weight < 0 || weight > 1) return -1;
+    if (path.size() == 0) return -1;
+
+    std::vector<double> delays;
+
+    unsigned current_time = start_time;
+    double delay = 0;
+    double total_delay = 0;
+
+    double average; //f
+    double deviation; //g
+
+    Vertex<T> *first;
+    Vertex<T> *second;
+    Edge<T> *edge;
+    Vertex<T> *current_v;
+
+    if (origin == nullptr) return -1;
+
+    for (int i = 0; i < path.size(); i++) {
+        if (i == 0) first = origin;
+        else first = path[i - 1];
+        second = path[i];
+        edge = findEdge(first, second);
+        current_v = second;
+        if (edge == nullptr || current_v == nullptr) return -1;
+        delay = (current_time + edge->cost / velocity) - current_v->hour;
+        if (delay < current_v->tolerance) delay = 0;
+        if (max_tolreance_cap && delay > current_v->max_tolerance) return INF;
         delays.push_back(delay);
         total_delay += delay;
         if (current_time + edge->cost / velocity < current_v->hour - early_time)
@@ -2348,6 +2367,17 @@ std::vector<T> Graph<T>::vanPathtoViewPath(std::vector<std::pair<Van, std::vecto
         result.push_back(og);
     }
     return result;
+}
+
+template<class T>
+double Graph<T>::costFuntionMultipleVans(std::vector<std::pair<Van, std::vector<Vertex<T > *>>> van_path, const T &og){
+    double totalCost = 0.0;
+    Vertex<T> * origin = findVertex(og);
+    if(origin == nullptr) return -1;
+    for(int i = 0; i < van_path.size(); i++){
+         totalCost += costFunctionTotal(origin, van_path[i].first.getVisitTime(), van_path[i].second, false);
+    }
+    return totalCost;
 }
 
 #endif /* PROJ_GRAPH_H_ */

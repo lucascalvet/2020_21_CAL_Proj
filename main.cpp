@@ -44,13 +44,12 @@ void PrintVector(vector<T> vec, string title) {
     }
 }
 
-vector<double> countTimes(Graph<unsigned> ip_graph, unsigned bakery) {
+vector<double> countTimes(Graph<unsigned> ip_graph, unsigned bakery, vector<Van> vans) {
     vector<double> times;
-
     auto start = chrono::high_resolution_clock::now();; // Record start time
     auto finish = chrono::high_resolution_clock::now(); // Record end time
     start = chrono::high_resolution_clock::now();
-    ip_graph.bruteForceTimes(bakery);
+    ip_graph.dividingClustersBrute(vans, bakery);
     finish = chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     times.push_back(elapsed.count());
@@ -165,12 +164,73 @@ void calculateRoutes(unsigned bakery, Graph<unsigned> &main_map, Graph<unsigned>
     }
 }
 
+void calculateFleetRoutes(unsigned bakery, Graph<unsigned> &main_map, Graph<unsigned> &ip_map) {
+    Menu route_menu("Calcular rotas para frotas");
+    route_menu.pushOption("Adicionar carrinha");
+    route_menu.pushOption("Definir carrinhas predefinidas");
+    route_menu.pushOption("Eliminar todas as carrinhas");
+    route_menu.pushOption("Clusters + Greedy");
+    route_menu.pushOption("Clusters + Brute Force");
+    route_menu.pushOption("Voltar");
+    unsigned choice, visit_time, capacity;
+    double cost;
+    vector<Van> vans;
+    vector<unsigned> view_path;
+    vector<unsigned> ips;
+    std::vector<std::pair<Van, std::vector<Vertex<unsigned> *>>> van_paths;
+    for (Vertex<unsigned> *v: ip_map.getVertexSet()) {
+        ips.push_back(v->getInfo());
+    }
+
+    while (true) {
+        choice = route_menu.chooseOption();
+        switch (choice) {
+            case 0:
+                visit_time = getUnsigned("Tempo de visita");
+                capacity = getUnsigned("Capacidade");
+                vans.push_back(Van(vans.size(), visit_time, capacity));
+                break;
+            case 1:
+                vans.clear();
+                vans.push_back(Van(1, 2, 10));
+                vans.push_back(Van(2, 3, 10));
+                vans.push_back(Van(3, 5, 10));
+                break;
+            case 2:
+                vans.clear();
+                break;
+            case 3:
+                van_paths = ip_map.dividingClustersGreedy(vans, bakery);
+                ip_map.followVansPath(van_paths, bakery);
+                view_path = ip_map.vanPathtoViewPath(van_paths, bakery);
+                ip_map.viewGraphPath(view_path, ips, true, true, true, true, true);
+                //main_map.viewGraphPathIP(ip_map, view_path, true, true, true, true, true);
+                break;
+            case 4:
+                van_paths = ip_map.dividingClustersBrute(vans, bakery);
+                ip_map.followVansPath(van_paths, bakery);
+                view_path = ip_map.vanPathtoViewPath(van_paths, bakery);
+                ip_map.viewGraphPath(view_path, ips, true, true, true, true, true);
+                //main_map.viewGraphPathIP(ip_map, view_path, true, false, true, true, true);//TODO: WORKING
+                break;
+            case 5:
+                return;
+            default:
+                break;
+        }
+
+    }
+}
+
 void mainMenu() {
     Graph<unsigned> main_map = Graph<unsigned>();
     Graph<unsigned> ip_map = Graph<unsigned>();
     vector<unsigned> ids, ips;
     bool modif = false;
     unsigned bakery = UINF, client, vertex, time, hour, tolerance, max_tolerance;
+    auto start = chrono::high_resolution_clock::now();
+    auto finish = chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finish - start;
     Menu main_menu("Menu principal");
     main_menu.pushOption("Carregar mapa");
     main_menu.pushOption("Visualizar mapa");
@@ -178,6 +238,8 @@ void mainMenu() {
     main_menu.pushOption("Definir cliente");
     main_menu.pushOption("Inserir impedimentos de transito");
     main_menu.pushOption("Calcular rotas");
+    main_menu.pushOption("Calcular rotas para frotas");
+    main_menu.pushOption("Analisar conectividade dos pontos de interesse");
     main_menu.pushOption("Reset para dados predefinidos");
     main_menu.pushOption("Reset");
     main_menu.pushOption("Sair");
@@ -285,17 +347,52 @@ void mainMenu() {
                 }
                 calculateRoutes(bakery, main_map, ip_map);
                 break;
-            case 6: // Reset para dados predefinidos
+            case 6: // Calcular Rotas para Frotas
+                if (bakery == UINF) {
+                    cout << "A Padaria nao esta definida!\n";
+                    stopConsole();
+                    break;
+                }
+                if (ids.empty()) {
+                    cout << "Nenhum cliente definido!\n";
+                    stopConsole();
+                    break;
+                }
+                ips = ids;
+                ips.push_back(bakery);
+                if (modif) {
+                    cout
+                            << "A correr o algoritmo de Dijkstra para calcular os caminhos mais curtos entre os pontos de interesse...";
+                    ip_map = main_map.generateInterestPointsGraph(ips);
+                    cout << "Concluido.\n";
+                    modif = false;
+                }
+                calculateFleetRoutes(bakery, main_map, ip_map);
+                break;
+            case 7:
+                ips = ids;
+                ips.push_back(bakery);
+                start = chrono::high_resolution_clock::now(); // Record start time
+                if (main_map.checkConectivity(ips)) {
+                    cout
+                            << "Passou teste da conectividade.\nTodos os pontos de interesse fazem parte do mesmo componente fortemente conexo.\n";
+                } else
+                    cout
+                            << "Não passou no teste da conectividade.\nOs pontos de interesse fazem parte do mesmo componente fortemente conexo.\n";
+                finish = chrono::high_resolution_clock::now(); // Record end time
+                elapsed = finish - start;
+                break;
+            case 8: // Reset para dados predefinidos
                 ids.clear();
                 ips.clear();
                 main_map = Graph<unsigned>();
                 ip_map = Graph<unsigned>();
                 cout << "Todos os valores foram apagados.\n";
-                cout << "A importar o mapa...\n";
+                cout << "A importar o mapa, pode demorar algum tempo...\n";
                 main_map.importGraph("../resources/Porto/porto_strong_nodes_xy.txt",
                                      "../resources/Porto/porto_strong_edges.txt", false);
                 cout << "A definir padaria e clientes...\n";
-                ids = {9, 11, 26, 26806, 26809, 26820, 47, 62};
+                ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 62};
                 bakery = 174;
                 main_map.setEarlyTime(5);
                 main_map.setStartTime(420);
@@ -312,7 +409,7 @@ void mainMenu() {
                 modif = true;
                 cout << "Concluido.\n";
                 break;
-            case 7: // Reset
+            case 9: // Reset
                 bakery = UINF;
                 ids.clear();
                 ips.clear();
@@ -321,7 +418,7 @@ void mainMenu() {
                 modif = true;
                 cout << "Todos os valores foram apagados.\n";
                 break;
-            case 8: // Sair
+            case 10: // Sair
                 quit = true;
                 break;
             default:
@@ -331,8 +428,8 @@ void mainMenu() {
 }
 
 int main() {
-    //mainMenu();
-    //return 0;
+    mainMenu();
+    return 0;
 
     // ------------- TIME TESTS ---------------
     Graph<unsigned> main_g;
@@ -342,14 +439,19 @@ int main() {
     Graph<unsigned> ip_g;
     vector<double> bf_times;
     vector<double> times;
-    vector<unsigned> ip_ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 62, 16, 17, 21, 26, 27, 28, 30, 37, 39, 41, 47,
-                               50, 53, 56, 57, 60}; //62, 63, 66, 67, 69, 71, 73, 74, 75, 76, 80, 81, 82, 83, 84, 88, 89};
+    vector<unsigned> ip_ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 16, 17, 21, 26, 27, 28, 30, 37, 39, 41, 47,
+                               50, 53, 56, 57, 60, 91, 63, 66, 67, 69, 71, 73, 74, 75, 76, 80, 81, 82, 83, 84, 88, 89};
     vector<unsigned> input_ids;
     main_g.setEarlyTime(5);
     main_g.setStartTime(420);
     main_g.setVelocity(800);
     main_g.setVisitTime(5);
-    /*
+
+    vector<Van> vans;
+    vans.push_back(Van(1, 2, 10));
+    vans.push_back(Van(2, 3, 10));
+    vans.push_back(Van(3, 5, 10));
+
     main_g.findVertex(9)->setTimes(430, 5, 10);
     main_g.findVertex(26)->setTimes(435, 5, 10);
     main_g.findVertex(26806)->setTimes(440, 5, 10);
@@ -373,8 +475,25 @@ int main() {
     main_g.findVertex(53)->setTimes(535, 5, 10);
     main_g.findVertex(56)->setTimes(540, 5, 10);
     main_g.findVertex(57)->setTimes(545, 5, 10);
-    main_g.findVertex(60)->setTimes(450, 5, 10);
-     */
+    main_g.findVertex(60)->setTimes(550, 5, 10);
+    main_g.findVertex(91)->setTimes(555, 5, 10);
+    main_g.findVertex(63)->setTimes(560, 5, 10);
+    main_g.findVertex(67)->setTimes(565, 5, 10);
+    main_g.findVertex(69)->setTimes(570, 5, 10);
+    main_g.findVertex(71)->setTimes(575, 5, 10);
+    main_g.findVertex(73)->setTimes(580, 5, 10);
+    main_g.findVertex(74)->setTimes(585, 5, 10);
+    main_g.findVertex(75)->setTimes(590, 5, 10);
+    main_g.findVertex(76)->setTimes(595, 5, 10);
+    main_g.findVertex(80)->setTimes(600, 5, 10);
+    main_g.findVertex(81)->setTimes(605, 5, 10);
+    main_g.findVertex(82)->setTimes(610, 5, 10);
+    main_g.findVertex(83)->setTimes(615, 5, 10);
+    main_g.findVertex(84)->setTimes(620, 5, 10);
+    main_g.findVertex(88)->setTimes(625, 5, 10);
+    main_g.findVertex(89)->setTimes(630, 5, 10);
+
+/*
     main_g.findVertex(9)->setTimes(430, 5, 300);
     main_g.findVertex(26)->setTimes(430, 5, 300);
     main_g.findVertex(26806)->setTimes(430, 5, 300);
@@ -399,187 +518,35 @@ int main() {
     main_g.findVertex(56)->setTimes(430, 5, 300);
     main_g.findVertex(57)->setTimes(430, 5, 300);
     main_g.findVertex(60)->setTimes(430, 5, 300);
+*/
+
     cout << "Calculating times...\n";
+
     unsigned counter = 1;
+    string nn_out_file = "bf_times_out.txt";
+    ofstream nn_times_file(nn_out_file);
     for (auto id = ip_ids.begin() + 2; id <= ip_ids.end(); id++) {
         input_ids = vector<unsigned>(ip_ids.begin(), id);
         ip_g = main_g.generateInterestPointsGraph(input_ids);
         cout << counter << " clientes\n";
-        times = countTimes(ip_g, 174);
+        times = countTimes(ip_g, 174, vans);
+        nn_times_file << times.at(0) << endl;
         bf_times.push_back(times.at(0));
         counter++;
     }
 
+
+    /*
     string nn_out_file = "bf_times_out.txt";
     cout << "Writing results to " << nn_out_file << endl;
     ofstream nn_times_file(nn_out_file);
     for (auto time : bf_times) {
         nn_times_file << time << endl;
     }
-
+*/
     nn_times_file.close();
     cout << "Done!\n";
 
     return 0;
     // ------------- END TIME TESTS ---------------
-
-
-    cout << "Start" << endl;
-
-    Graph<unsigned> g;
-    Graph<unsigned> gg;
-    /*
-    cout << "Importing graph..." << endl;
-    time_t start_time = time(NULL);
-    g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt");
-    cout << "Calculating scc..." << endl;
-    cout << "STRONG Detected " << g.dfsConnectivity().size() << " scc's" << endl;
-     */
-
-
-    cout << "Importing graph..." << endl;
-    //g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt", false);
-    g.importGraph("../resources/Porto/porto_strong_nodes_latlng.txt", "../resources/Porto/porto_strong_edges.txt",
-                  true);
-    //gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
-    //cout << "Calculating scc..." << endl;
-    //cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
-    //g.importGraph("../resources/Espinho/espinho_strong_nodes_xy.txt", "../resources/Espinho/espinho_strong_edges.txt");
-    //time_t end_time = time(NULL);
-    //cout << "Finished importing graph in " << end_time - start_time << " s" << endl;
-    g.setEarlyTime(5);
-    g.setStartTime(0);
-    g.setVelocity(100);
-    g.setVisitTime(5);
-    g.findVertex(9)->setTimes(100, 5, 10);
-    g.findVertex(26)->setTimes(150, 5, 10);
-    g.findVertex(26806)->setTimes(160, 5, 10);
-    g.findVertex(26809)->setTimes(170, 5, 10);
-    g.findVertex(26820)->setTimes(490, 5, 10);
-    g.findVertex(47)->setTimes(599, 5, 10);
-    g.findVertex(62)->setTimes(600, 5, 10);
-    vector<unsigned> ids = {9, 11, 26, 26806, 26809, 26820, 47, 62};
-    //vector<unsigned> ids {8932, 13373};
-    cout << "Running Dijkstra..." << endl;
-    Graph<unsigned> minig = g.generateInterestPointsGraph(ids);
-    //Graph<unsigned> minig = gg.generateInterestPointsGraph(ids);
-    //GraphPrintInfo(g);
-
-
-    std::vector<Cluster<unsigned>> vc = minig.getClusters(11);
-
-    for (Cluster<unsigned> c : vc) {
-        c.PrintInfo();
-    }
-
-    std::vector<Van> vv;
-    vv.push_back(Van(7, 5, 10));
-    //vv.push_back(Van(2, 40, 10));
-    vv.push_back(Van(3, 2, 10));
-    vv.push_back(Van(4, 12, 10));
-    //vv.push_back(Van(5, 1, 10));
-
-    cout << "Dividing Clusters Greedy..." << endl;
-
-    vector<pair<Van, vector<Vertex<unsigned> *>>> van_pairs = minig.dividingClustersGreedy(vv, 11);
-    //vector<pair<Van, vector<Vertex<unsigned > *>>> van_pairs = minig.dividingClustersBrute(vv, 11);
-    for (int i = 0; i < van_pairs.size(); i++) {
-        cout << "Van " << van_pairs[i].first.getID() << ": ";
-        for (int j = 0; j < van_pairs[i].second.size(); j++) {
-            cout << van_pairs[i].second[j]->getInfo() << " ";
-        }
-        cout << "END" << endl;
-    }
-
-    minig.followVansPath(van_pairs, 11);
-    vector<unsigned> viewPath = minig.vanPathtoViewPath(van_pairs, 11);
-    minig.viewGraphPath(viewPath, ids, true, true, true, true, true);
-
-    return 0;
-
-
-    //GraphPrintInfo(minig);
-    //minig.viewGraph();
-
-    /*
-    minig.findVertex(9)->setTimes(20, 5, 10);
-    minig.findVertex(26)->setTimes(40, 5, 10);
-    minig.findVertex(26806)->setTimes(50, 5, 10);
-    minig.findVertex(26809)->setTimes(60, 5, 10);
-    minig.findVertex(26820)->setTimes(110, 5, 10);
-    minig.findVertex(47)->setTimes(125, 5, 10);
-    minig.findVertex(62)->setTimes(140, 5, 10);
-     */
-
-    //vector<unsigned> ov = minig.getOverlapClients(26806);
-    //vector<unsigned> ovt = minig.getOverlapClientsTravelling(26806);
-
-    /*
-    cout << "Running Nearest Neighbour Times..." << endl;
-    minig.nearestNeighbourTimes(11);
-    cout << "Getting path..." << endl;
-    pair<vector<unsigned>, double> nnt_path = minig.getPath(11, 11);
-
-    minig.printTimes();
-    cout << "GraphViewer..." << endl;
-    minig.viewGraphPath(nnt_path.first, ids, true, true, true, true, true);
-
-
-    cout << "Running Brute Force Times..." << endl;
-    if (minig.bruteForceTimes(11) == INF) cout << "Impossible path!\n";
-    else {
-        cout << "Getting path..." << endl;
-        pair<vector<unsigned>, double> bf_path = minig.getPath(11, 11);
-
-        minig.printTimes();
-
-        cout << "GraphViewer..." << endl;
-        minig.viewGraphPath(bf_path.first, ids, true, true, true, true, true);
-    }
-
-    return 0;
-
-    cout << "Running Held-Karp..." << endl;
-    minig.heldKarp(11);
-
-    cout << "Getting path..." << endl;
-    pair<vector<unsigned>, double> hk_path = minig.getPath(11, 11);
-
-    cout << "GraphViewer..." << endl;
-
-    /*
-    if(minig.getVertexSet().size() != 0){
-        g.viewGraphIP(minig);
-    }
-    */
-
-    //PrintVector(ov, "OV[26806]");
-    //PrintVector(ovt, "OVT[26806]");
-
-
-    //minig.viewGraphPath(hk_path.first, ids, false, true);
-    //g.viewGraph();
-
-    //g.viewGraphPathIP(minig, hk_path.first, true, true);
-    /*
-    minig.viewGraphPath(hk_path.first, ids, true, true, true, true);
-
-    cout << "Running Nearest Neighbour..." << endl;
-    minig.nearestNeighbour(11);
-    cout << "Getting path..." << endl;
-    pair<vector<unsigned>, double> nn_path = minig.getPath(11, 11);
-
-    cout << "GraphViewer..." << endl;
-    minig.viewGraphPath(nn_path.first, ids, true, true, true, true);
-
-    cout << "HK: " << hk_path.second << " vs NN: " << nn_path.second << endl;
-    minig.printTimes();
-    //g.viewGraphPathIP(minig, nn_path.first, true);
-
-
-    double dist = calculateDistHaversine(-8.577122, 41.172792, -8.616987, 41.150174);
-    //double dist = calculateDistHaversine(41.172792, -8.577122, 41.150174, -8.616987);
-    double old_dist = calculateDist(6218.020297963754, -2100.583359242417, 1785.2345472782617, 414.4234916046262);
-    cout << "XY DIST: " << old_dist << " vs LATLNG DIST: " << dist << endl;
-     */
 }
