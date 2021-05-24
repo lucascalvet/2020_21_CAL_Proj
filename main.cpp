@@ -1,6 +1,7 @@
 #include <iostream>
 #include <ctime>
 #include <chrono>
+#include <fstream>
 #include "Graph.h"
 #include "Menu.h"
 #include "Utils.h"
@@ -41,6 +42,19 @@ void PrintVector(vector<T> vec, string title) {
             cout << ", ";
         } else cout << endl;
     }
+}
+
+vector<double> countTimes(Graph<unsigned> ip_graph , unsigned bakery) {
+    vector<double> times;
+
+    auto start = chrono::high_resolution_clock::now();; // Record start time
+    auto finish = chrono::high_resolution_clock::now(); // Record end time
+    start = chrono::high_resolution_clock::now();
+    ip_graph.heldKarp(bakery);
+    finish = chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finish - start;
+    times.push_back(elapsed.count());
+    return times;
 }
 
 void importMap(Graph<unsigned> &map) {
@@ -134,7 +148,7 @@ void calculateRoutes(unsigned bakery, Graph<unsigned> &main_map, Graph<unsigned>
             default:
                 return;
         }
-        auto finish = std::chrono::high_resolution_clock::now(); // Record end time
+        auto finish = chrono::high_resolution_clock::now(); // Record end time
         std::chrono::duration<double> elapsed = finish - start;
         if (choice > 1) {
             ip_map.printTimes();
@@ -194,7 +208,7 @@ void mainMenu() {
                     bakery = getUnsigned("Indice da padaria");
                 }
                 time = getUnsigned("Velocidade media das carrinhas (km/h)");
-                main_map.setVelocity(time);
+                main_map.setVelocity(time * (1000/60));
                 time = getUnsigned("Hora de saida da padaria (min desde as 0:00)");
                 main_map.setEarlyTime(time);
                 time = getUnsigned("Tempo permitido de antecedencia (min)");
@@ -285,15 +299,16 @@ void mainMenu() {
                 bakery = 174;
                 main_map.setEarlyTime(5);
                 main_map.setStartTime(420);
-                main_map.setVelocity(50);
+                main_map.setVelocity(800);
                 main_map.setVisitTime(5);
                 main_map.findVertex(9)->setTimes(430, 5, 10);
                 main_map.findVertex(26)->setTimes(435, 5, 10);
                 main_map.findVertex(26806)->setTimes(440, 5, 10);
-                main_map.findVertex(26809)->setTimes(445, 5, 10);
-                main_map.findVertex(26820)->setTimes(450, 5, 10);
+                main_map.findVertex(26809)->setTimes(445, 5, 15);
+                main_map.findVertex(26820)->setTimes(450, 5, 20);
                 main_map.findVertex(47)->setTimes(455, 5, 10);
                 main_map.findVertex(62)->setTimes(460, 5, 10);
+                main_map.findVertex(11)->setTimes(470, 5, 8);
                 modif = true;
                 cout << "Concluido.\n";
                 break;
@@ -316,9 +331,44 @@ void mainMenu() {
 }
 
 int main() {
-    mainMenu();
-    return 0;
+    //mainMenu();
+    //return 0;
 
+/*
+    // ------------- TIME TESTS ---------------
+    Graph<unsigned> main_g;
+    cout << "Importing graph...\n";
+    main_g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt", false);
+    Graph<unsigned> ip_g;
+    vector<double> hk_times;
+    vector<double> times;
+    vector<unsigned> ip_ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 62};
+    vector<unsigned> input_ids;
+    cout << "Calculating times...\n";
+    unsigned counter = 1;
+    for (auto id = ip_ids.begin() + 2; id != ip_ids.end(); id++) {
+        input_ids = vector<unsigned>(ip_ids.begin(), id);
+        ip_g = main_g.generateInterestPointsGraph(input_ids);
+        cout << counter << " clientes\n";
+        times = countTimes(ip_g, 174);
+        hk_times.push_back(times.at(0));
+        counter++;
+    }
+
+    string out_file = "hk_times_out.txt";
+    cout << "Writing results to " << out_file << endl;
+    ofstream hk_times_file(out_file);
+    for (auto time : hk_times) {
+        hk_times_file << time << endl;
+    }
+
+    hk_times_file.close();
+    cout << "Done!\n";
+
+    return 0;
+    // ------------- END TIME TESTS ---------------
+
+*/
     cout << "Start" << endl;
 
     Graph<unsigned> g;
@@ -344,19 +394,47 @@ int main() {
     g.setStartTime(0);
     g.setVelocity(100);
     g.setVisitTime(5);
-    g.findVertex(9)->setTimes(400, 5, 10);
-    g.findVertex(26)->setTimes(100, 5, 10);
-    g.findVertex(26806)->setTimes(200, 5, 10);
-    g.findVertex(26809)->setTimes(250, 5, 10);
-    g.findVertex(26820)->setTimes(500, 5, 10);
-    g.findVertex(47)->setTimes(600, 5, 10);
-    g.findVertex(62)->setTimes(650, 5, 10);
+    g.findVertex(9)->setTimes(100, 5, 10);
+    g.findVertex(26)->setTimes(150, 5, 10);
+    g.findVertex(26806)->setTimes(160, 5, 10);
+    g.findVertex(26809)->setTimes(170, 5, 10);
+    g.findVertex(26820)->setTimes(490, 5, 10);
+    g.findVertex(47)->setTimes(500, 5, 10);
+    g.findVertex(62)->setTimes(600, 5, 10);
     vector<unsigned> ids = {9, 11, 26, 26806, 26809, 26820, 47, 62};
     //vector<unsigned> ids {8932, 13373};
     cout << "Running Dijkstra..." << endl;
     Graph<unsigned> minig = g.generateInterestPointsGraph(ids);
     //Graph<unsigned> minig = gg.generateInterestPointsGraph(ids);
     //GraphPrintInfo(g);
+
+
+    std::vector<Cluster<unsigned>> vc = minig.getClusters(11);
+
+    for(Cluster<unsigned> c : vc){
+        c.PrintInfo();
+    }
+
+    std::vector<Van> vv;
+    vv.push_back(Van(1, 5, 10));
+    //vv.push_back(Van(2, 40, 10));
+    vv.push_back(Van(3, 2, 10));
+    //vv.push_back(Van(4, 12, 10));
+    //vv.push_back(Van(5, 1, 10));
+
+    cout << "Dividing Clusters Greedy..." << endl;
+
+    //vector<pair<Van, vector<Vertex<unsigned > *>>> van_pairs = minig.dividingClustersGreedy(vv, 11);
+    vector<pair<Van, vector<Vertex<unsigned > *>>> van_pairs = minig.dividingClustersBrute(vv, 11);
+    for(int i = 0; i < van_pairs.size(); i++){
+        cout << "Van " << van_pairs[i].first.getID() << ": ";
+        for(int j = 0; j < van_pairs[i].second.size(); j++){
+            cout << van_pairs[i].second[j]->getInfo() << " ";
+        }
+        cout << "END" << endl;
+    }
+
+    return 0;
 
     GraphPrintInfo(minig);
     //minig.viewGraph();

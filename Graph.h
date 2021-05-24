@@ -19,10 +19,10 @@
 constexpr auto INF = std::numeric_limits<double>::max();
 constexpr auto UINF = std::numeric_limits<unsigned>::max();
 
+class Van;
+
 template<class T>
 class Cluster;
-
-class Van;
 
 template<class T>
 class Vertex;
@@ -314,6 +314,14 @@ public:
     }
 };
 
+template<class T>
+class ClientArrivalCompare {
+public:
+    bool operator()(Vertex<T> *v1, Vertex<T> *v2) {
+        return v1->getHour() + v1->getTolerance() > v2->getHour() + v2->getTolerance();;
+    }
+};
+
 /*
  * ================================================================================================
  * Class Graph
@@ -443,7 +451,7 @@ public:
 
     double costFunctionTotal(Vertex<T> *og, std::vector<Vertex<T> *> path);
 
-    std::vector<T> getClusters(const T &origin);
+    std::vector<Cluster<T>> getClusters(const T &origin);
 
     std::vector<std::pair<Van, std::vector<Vertex<T> *>>> dividingClustersBrute(std::vector<Van> vans, const T &origin);
 
@@ -788,14 +796,18 @@ Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) 
 
 class Van {
 private:
+    unsigned id;
     unsigned visit_time;
     unsigned capacity;
 
 public:
-    Van(unsigned visit_time, unsigned capacity) {
+    Van(unsigned id, unsigned visit_time, unsigned capacity=1) {
+        this->id = id;
         this->visit_time = visit_time;
         this->capacity = capacity;
     }
+
+    unsigned getID() const { return this->id; }
 
     unsigned getVisitTime() const { return this->visit_time; }
 
@@ -809,20 +821,20 @@ public:
 
 class VanCompare {
 public:
-    bool operator()(const Van *v1, const Van *v2) {
-        return v1->getVisitTime() < v2->getVisitTime();
+    bool operator()(Van v1, Van v2) {
+        return v1.getVisitTime() > v2.getVisitTime();
     }
 };
 
 template<class T>
 class Cluster {
 private:
-    Graph<T> graph;
+    Graph<T> * graph;
     std::vector<T> info_set;
     std::vector<Vertex<T> *> vertex_set;
 
 public:
-    Cluster(Graph<T> graph, std::vector<T> info_set) {
+    Cluster(Graph<T> * graph, std::vector<T> info_set) {
         this->graph = graph;
         this->info_set = info_set;
     }
@@ -840,10 +852,17 @@ public:
         addInfo(v->info);
     }
 
+    void PrintInfo(){
+        for(T info : info_set){
+            std::cout << info << " ";
+        }
+        std::cout << "END" << std::endl;
+    }
+
     unsigned getTotalQuantity() const {
         unsigned totalQuantity = 0;
         for (T info : info_set){
-            Vertex<T> * v = graph.findVertex(info);
+            Vertex<T> * v = graph->findVertex(info);
             if(v == nullptr) return UINF;
             totalQuantity += v->getQuantity();
         }
@@ -861,7 +880,7 @@ public:
         unsigned minHour = UINF;
         Vertex<T> *selected_vertex = nullptr;
         for (T info : info_set) {
-            Vertex<T> *vertex = graph.findVertex(info);
+            Vertex<T> *vertex = graph->findVertex(info);
             if (vertex != nullptr) {
                 unsigned vertex_mh = vertex->getHour() + vertex->getTolerance();
                 if (vertex_mh < minHour) {
@@ -877,10 +896,10 @@ public:
         unsigned maxHour = 0;
         Vertex<T> *selected_vertex = nullptr;
         for (T info : info_set) {
-            Vertex<T> *vertex = graph.findVertex(info);
+            Vertex<T> *vertex = graph->findVertex(info);
             if (vertex != nullptr) {
                 //unsigned vertex_mh = vertex->getHour() + vertex->getTolerance() + graph.getVisitTime();
-                unsigned vertex_mh = vertex->getHour() + vertex->getMaxTolerance() + graph.getVisitTime();
+                unsigned vertex_mh = vertex->getHour() + vertex->getMaxTolerance() + graph->getVisitTime();
                 if (vertex_mh > maxHour) {
                     maxHour = vertex_mh;
                     selected_vertex = vertex;
@@ -911,30 +930,52 @@ public:
 
     bool hasCommon(Cluster<T> otherCluster);
 
+    std::vector<Vertex<T> *> exportVertices(){
+        std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientArrivalCompare<T>> vertex_queue;
+        std::vector<Vertex<T> *> result;
+        for(T info: info_set){
+            Vertex<T> * v = graph->findVertex(info);
+            if(v == nullptr) return {};
+            vertex_queue.push(v);
+        }
+        while(!vertex_queue.empty()){
+            result.push_back(vertex_queue.top());
+            vertex_queue.pop();
+        }
+        return result;
+    }
+
+    /*
+    Cluster<T> operator=(Cluster<T> otherCluster){
+        //this->info_set = otherCluster.info_set;
+        //return this;
+        return Cluster<T>(graph, otherCluster.getInfoSet());
+    }
+     */
 };
 
 
 template<class T>
 class ClusterCompareArrival {
 public:
-    bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
-        return c1->getArrivalHour().second < c2->getArrivalHour().second;
+    bool operator()(Cluster<T> c1, Cluster<T> c2) {
+        return c1.getArrivalHour().second > c2.getArrivalHour().second;
     }
 };
 
 template<class T>
 class ClusterCompareDeparture {
 public:
-    bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
-        return c1->getDepartureHour().second < c2->getDepartureHour().second;
+    bool operator()(Cluster<T> c1, Cluster<T> c2) {
+        return c1.getDepartureHour().second > c2.getDepartureHour().second;
     }
 };
 
 template<class T>
 class ClusterCompareSize {
 public:
-    bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
-        return c1->getSize() > c2->getSize();
+    bool operator()(Cluster<T> c1, Cluster<T> c2) {
+        return c1.getSize() < c2.getSize();
     }
 };
 
@@ -961,10 +1002,17 @@ double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster) {
     std::pair<Vertex<T> *, unsigned> arrival = otherCluster.getArrivalHour();
     if (arrival.first == nullptr || departure.first == nullptr) return INF;
 
-    Edge<T> *edge = graph.findEdge(departure.first, arrival.first); //TODO: removed getInfo()
+    std::cout << "d->" << departure.second << " vs a->" << arrival.second << std::endl;
+
+    Edge<T> *edge = graph->findEdge(departure.first, arrival.first); //TODO: removed getInfo()
     if (edge == nullptr) return INF;
 
-    double travelling_time = edge->getCost() / graph.getVelocity();
+    double travelling_time = edge->getCost() / graph->getVelocity();
+
+    std::cout << "d+t->" << departure.second + travelling_time << " vs(<= 0) a->" << arrival.second << std::endl;
+    std::cout << "d+t->" << departure.second + travelling_time << " vs(> INF) max_a->" << otherCluster.getMaxArrivalHour() << std::endl;
+    std::cout << "return delay->" << departure.second + travelling_time - arrival.second << std::endl;
+
     if (departure.second + travelling_time <= arrival.second) return 0;
     else if (departure.second + travelling_time > otherCluster.getMaxArrivalHour()) return INF;
     else return departure.second + travelling_time - arrival.second;
@@ -974,16 +1022,16 @@ double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster) {
 template<class T>
 double Cluster<T>::calculateOriginCost(const T &origin, bool to_origin) {
     if (to_origin) {
-        Edge<T> *edge = graph.findEdge(getDepartureVertex()->info, origin);
+        Edge<T> *edge = graph->findEdge(getDepartureVertex()->getInfo(), origin);
         if (edge == nullptr) return INF;
         return edge->getCost();
     } else {
         std::pair<Vertex<T> *, unsigned> arrival = getArrivalHour();
-        Edge<T> *edge = graph.findEdge(origin, arrival.first->getInfo());
+        Edge<T> *edge = graph->findEdge(origin, arrival.first->getInfo());
         if (edge == nullptr) return -1;
-        double delay = graph.getStartTime() + edge->getCost() - arrival.second;
+        double delay = graph->getStartTime() + edge->getCost() - arrival.second;
         if (delay < 0) return 0;
-        if (graph.getStartTime() + edge->getCost() > getMaxArrivalHour()) return INF;
+        if (graph->getStartTime() + edge->getCost() > getMaxArrivalHour()) return INF;
         return delay;
     }
 }
@@ -1661,7 +1709,7 @@ std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(std::vector<T> remai
 }
 
 template<class T>
-std::vector<T> Graph<T>::getClusters(const T &origin) {
+std::vector<Cluster<T>> Graph<T>::getClusters(const T &origin) {
     Vertex<T> *orig = findVertex(origin);
     std::vector<Cluster<T>> result;
     if (orig == nullptr) {
@@ -1675,19 +1723,24 @@ std::vector<T> Graph<T>::getClusters(const T &origin) {
     std::vector<T> temp;
 
     for (Vertex<T> *v : vertexSet) {
+        std::cout << "GC -> " << v->info << std::endl;
         temp.clear();
         if (v->info != origin) {
-            temp.push(v);
+            temp.push_back(v->info);
             Cluster<T> cluster(this, temp);
             cluster_queue.push(cluster);
         }
     }
 
+    std::cout << "GC SIZE-> " << cluster_queue.size() << std::endl;
     Cluster<T> main_cluster = Cluster<T>(this, {});
 
     while (!cluster_queue.empty()) {
         temp_clusters.clear();
-        main_cluster = cluster_queue.pop();
+        main_cluster = cluster_queue.top();
+        std::cout << "GC MC-> ";
+        main_cluster.PrintInfo();
+        cluster_queue.pop();
         while (!cluster_queue.empty()) {
             Cluster<T> other_cluster = cluster_queue.top();
             if (main_cluster.calculateClusterCost(other_cluster) == 0) {
@@ -1707,23 +1760,49 @@ std::vector<T> Graph<T>::getClusters(const T &origin) {
 template<class T>
 class ClusterPairCompare {
 public:
-    bool operator()(const std::pair<std::vector<Cluster<T>>, double> *cp1,
-                    const std::pair<std::vector<Cluster<T>>, double> *cp2) {
-        return cp1->second < cp2->second;
+    bool operator()(std::pair<std::vector<Cluster<T>>, double> cp1,
+                    std::pair<std::vector<Cluster<T>>, double> cp2) {
+        return cp1.second > cp2.second;
     }
 };
 
-//TODO: Make a Van class and implement it here! (Change VisitTime everywhere)
+//TODO: Make a Van class and implement it here! (Change everywhere)
 template<class T>
 std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
 Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
+    std::cout << "Starting dividingClustersBrute..." << std::endl;
+    std::cout << "Getting Clusters..." << std::endl;
     std::vector<Cluster<T>> clusters = getClusters(origin);
-    unsigned vans_no = vans.size();
     std::vector<Vertex<T> *> vertices;
+    std::cout << "Brute Clusters:" << std::endl;
+    for(Cluster<T> c : clusters){
+        c.PrintInfo();
+    }
+    unsigned vans_no = vans.size();
+
+    if(vans_no == 0){
+        std::vector<std::pair<Van, std::vector<Vertex<T> *>>> empty_result;
+        empty_result.push_back(std::pair<Van, std::vector<Vertex<T> *>>(Van(-1, 0, 0), {}));
+        return empty_result;
+    }
+    if(vans_no == 1){
+        vertices.clear();
+        for(Cluster<T> c : clusters){
+            for(T info : c.getInfoSet()){
+                vertices.push_back(findVertex(info));
+            }
+        }
+        std::vector<std::pair<Van, std::vector<Vertex<T> *>>> single_result;
+        single_result.push_back(std::pair<Van, std::vector<Vertex<T> *>>(vans[0], vertices));
+        return single_result;
+        //return std::vector<std::pair<Van, std::vector<Vertex<T> *>>>(vans[0], vertices);
+    }
+
     std::vector<Cluster<T>> final_clusters;
     std::vector<std::pair<Van, std::vector<Vertex<T> *>>> result_pairs;
 
     if (clusters.size() > vans_no) {
+        std::cout << "[Brute] More Clusters than Vans..." << std::endl;
         /*
         std::vector<std::vector<double>> cost_matrix(clusters.size() + 1, std::vector<double>(clusters.size() + 1, INF));
         for(int i = 0; i < clusters.size() + 1; i++){
@@ -1743,8 +1822,8 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
         std::vector<double> to_origin_cost(clusters.size(), INF);
 
         for (int i = 0; i < clusters.size(); i++) {
-            from_origin_cost[i] = clusters[i].calculateClusterCost(origin);
-            to_origin_cost[i] = clusters[i].calculateClusterCost(origin, true);
+            from_origin_cost[i] = (clusters[i].calculateOriginCost(origin));
+            to_origin_cost[i] = (clusters[i].calculateOriginCost(origin, true));
         }
 
         int connections = clusters.size() - vans.size();
@@ -1771,7 +1850,8 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
 
         std::vector<std::pair<Cluster<T>, Cluster<T> >> cluster_pairs;
         for (int i = 0; i < connections; i++) {
-            std::vector<Cluster<T>> cluster_con = cluster_connections.pop().first;
+            std::vector<Cluster<T>> cluster_con = cluster_connections.top().first;
+            cluster_connections.pop();
             cluster_pairs.push_back(std::pair<Cluster<T>, Cluster<T> >(cluster_con[0], cluster_con[1]));
         }
         for (Cluster<T> cluster : clusters) {
@@ -1801,7 +1881,9 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
          */
         std::vector<Cluster<T>> merging_pairs;
         for (int i = 0; i < cluster_pairs.size(); i++) {
-            merging_pairs.push_back(cluster_pairs[i].first.mergeCluster(cluster_pairs[i].second));
+            (cluster_pairs[i].first).mergeCluster(cluster_pairs[i].second);
+            merging_pairs.push_back(cluster_pairs[i].first);
+            //merging_pairs.push_back((cluster_pairs[i].first).mergeCluster(cluster_pairs[i].second));
         }
 
         while (!merging_pairs.empty()) {
@@ -1810,7 +1892,7 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
             bool merged = false;
             for (int i = 0; i < merging_pairs.size(); i++) {
                 if (merging_pairs[i].hasCommon(c)) {
-                    merging_pairs[i] = merging_pairs[i].mergeCluster(c);
+                    (merging_pairs[i]).mergeCluster(c);
                     merged = true;
                     break;
                 }
@@ -1819,6 +1901,7 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
         }
 
     } else {
+        std::cout << "[Brute] Less Clusters than Vans..." << std::endl;
         final_clusters = clusters;
     }
 
@@ -1833,14 +1916,16 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
     }
     //int vcounter = 0;
     while (!final_cluster_queue.empty()) {
-        Cluster<T> cluster = final_cluster_queue.pop();
+        Cluster<T> cluster = final_cluster_queue.top();
+        final_cluster_queue.pop();
         vertices.clear();
         for (T info : cluster.getInfoSet()) {
             Vertex<T> *v = findVertex(info);
             if (v != nullptr) vertices.push_back(v);
         }
         //result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(vans[vcounter], vertices));
-        result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(van_queue.pop(), vertices));
+        result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(van_queue.top(), vertices));
+        van_queue.pop();
     }
 
     return result_pairs;
@@ -1850,23 +1935,49 @@ Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
 template<class T>
 std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
 Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
+    std::cout << "Starting dividingClustersGreedy..." << std::endl;
+    std::cout << "Getting Clusters..." << std::endl;
     std::vector<Cluster<T>> clusters = getClusters(origin);
-    unsigned vans_no = vans.size();
     std::vector<Vertex<T> *> vertices;
+    std::cout << "Greedy Clusters:" << std::endl;
+    for(Cluster<T> c : clusters){
+        c.PrintInfo();
+    }
+    unsigned vans_no = vans.size();
+
+    if(vans_no == 0) return std::vector<std::pair<Van, std::vector<Vertex<T> *>>>(Van(-1, 0, 0), {});
+    if(vans_no == 1){
+        vertices.clear();
+        for(Cluster<T> c : clusters){
+            for(T info : c.getInfoSet()){
+                vertices.push_back(findVertex(info));
+            }
+        }
+        return std::vector<std::pair<Van, std::vector<Vertex<T> *>>>(vans[0], vertices);
+    }
+
     std::vector<Cluster<T>> final_clusters;
     std::vector<std::pair<Van, std::vector<Vertex<T> *>>> result_pairs;
 
     if (clusters.size() > vans_no) {
+        std::cout << "[Greedy] More Clusters than Vans..." << std::endl;
         std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareArrival<T>> arrival_cluster_queue;
         std::vector<Cluster<T>> van_clusters(vans_no, Cluster<T>(this, {}));
+        for(int i = 0; i < clusters.size(); i++){
+            arrival_cluster_queue.push(clusters.at(i));
+        }
         int vcounter = 0;
         while(!arrival_cluster_queue.empty()){
-            van_clusters[vcounter] = van_clusters[vcounter].mergeCluster(arrival_cluster_queue.pop());
+            //van_clusters[vcounter] = (van_clusters[vcounter]).mergeCluster(arrival_cluster_queue.top());
+            (van_clusters[vcounter]).mergeCluster(arrival_cluster_queue.top());
+            van_clusters[vcounter].PrintInfo();
+            arrival_cluster_queue.pop();
             vcounter++;
             if(vcounter >= vans_no) vcounter = 0;
         }
         final_clusters = van_clusters;
     } else {
+        std::cout << "[Greedy] Less Clusters than Vans..." << std::endl;
         final_clusters = clusters;
     }
 
@@ -1881,14 +1992,19 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
     }
     //int vcounter = 0;
     while (!final_cluster_queue.empty()) {
-        Cluster<T> cluster = final_cluster_queue.pop();
+        Cluster<T> cluster = final_cluster_queue.top();
+        final_cluster_queue.pop();
         vertices.clear();
+        /*
         for (T info : cluster.getInfoSet()) {
             Vertex<T> *v = findVertex(info);
             if (v != nullptr) vertices.push_back(v);
         }
+         */
+        vertices = cluster.exportVertices();
         //result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(vans[vcounter], vertices));
-        result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(van_queue.pop(), vertices));
+        result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(van_queue.top(), vertices));
+        van_queue.pop();
     }
 
     return result_pairs;
@@ -1922,7 +2038,7 @@ double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element) {
     if (weight < 0 || weight > 1) return -1;
 
     unsigned current_time = start_time;
-    unsigned delay = 0;
+    double delay = 0;
     double total_delay = 0;
 
     double average; //f
