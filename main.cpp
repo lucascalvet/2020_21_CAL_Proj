@@ -334,7 +334,6 @@ int main() {
     //mainMenu();
     //return 0;
 
-/*
     // ------------- TIME TESTS ---------------
     Graph<unsigned> main_g;
     cout << "Importing graph...\n";
@@ -344,9 +343,13 @@ int main() {
     vector<double> times;
     vector<unsigned> ip_ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 62};
     vector<unsigned> input_ids;
+    main_g.setEarlyTime(5);
+    main_g.setStartTime(420);
+    main_g.setVelocity(800);
+    main_g.setVisitTime(5);
     cout << "Calculating times...\n";
     unsigned counter = 1;
-    for (auto id = ip_ids.begin() + 2; id != ip_ids.end(); id++) {
+    for (auto id = ip_ids.begin() + 2; id <= ip_ids.end(); id++) {
         input_ids = vector<unsigned>(ip_ids.begin(), id);
         ip_g = main_g.generateInterestPointsGraph(input_ids);
         cout << counter << " clientes\n";
@@ -368,7 +371,6 @@ int main() {
     return 0;
     // ------------- END TIME TESTS ---------------
 
-*/
     cout << "Start" << endl;
 
     Graph<unsigned> g;

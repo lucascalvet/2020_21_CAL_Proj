@@ -1045,6 +1045,10 @@ void Graph<T>::heldKarp(const T &origin) {
         return;
     }
     std::vector<Vertex<T> *> vertices = vertexSet;
+    if (vertices.size() == 1) {
+        std::cout << "[Held-Karp] Graph does not have clients!\n";
+    }
+
     vertices.erase(std::find(vertices.begin(), vertices.end(), orig));
     vertices.push_back(orig);
 
@@ -1107,7 +1111,7 @@ void Graph<T>::heldKarp(const T &origin) {
 
     std::cout << "[Held-Karp] Calculate final shortest path...\n";
     //Get the cheapest path from the precomputed path lengths using all but the origin vertex
-    unsigned final_dist, second_to_last;
+    unsigned final_dist = UINF, second_to_last = 0;
     for (unsigned last = 0; last < vertices.size() - 1; last++) {
         temp_dist = best.at((1 << (vertices.size() - 1)) - 1).at(last) + distance.at(last).at(vertices.size() - 1);
         if (temp_dist < final_dist) {
