@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <queue>
+#include <numeric>
 #include <limits>
 #include <iostream>
 #include <algorithm>
@@ -21,6 +22,8 @@ constexpr auto UINF = std::numeric_limits<unsigned>::max();
 template<class T>
 class Cluster;
 
+class Van;
+
 template<class T>
 class Vertex;
 
@@ -38,39 +41,41 @@ class Graph;
 
 template<class T>
 class Vertex {
-    T info;
-    double lat;
-    double lng;
-
 private:
-    std::vector<Edge<T> *> outgoing;
-    std::vector<Edge<T> *> incoming;
-    std::vector<Edge<T> *> adj;
-
-    bool visited = false;  // for path finding
-    //Edge<T> *path; // for path finding
-    Vertex<T> *path = NULL;
-    double dist = INF;   // for path finding
-    int queueIndex = 0; // required by MutablePriorityQueue
-
-    unsigned hour = 0;
-    unsigned tolerance = 0;
-    unsigned max_tolerance = 0;
-    unsigned quantity = 0;
-    unsigned visited_at;
-
-    explicit Vertex(T in);
-
-    /*
-    Vertex(T in, double x, double y, unsigned hour, unsigned tolerance, unsigned max_tolerance);
-
-    Vertex(T in, double x, double y);
-     */
-
     Vertex(T in, double lat, double lng, unsigned hour, unsigned tolerance, unsigned max_tolerance,
            unsigned quantity = 0);
 
     Vertex(T in, double lat, double lng, unsigned quantity = 0);
+
+    /// unique identifier of the vertex
+    T info;
+    /// latitude (or x) position of the vertex
+    double lat;
+    /// longitude (or y) position of the vertex
+    double lng;
+    /// outgoing edges of the vertex
+    std::vector<Edge<T> *> outgoing;
+    /// incoming edges of the vertex
+    std::vector<Edge<T> *> incoming;
+    /// all edges of the vertex
+    std::vector<Edge<T> *> adj;
+    /// used for path finding
+    bool visited = false;
+    Vertex<T> *path = NULL;
+    double dist = INF;
+    /// required by MutablePriorityQueue
+    int queueIndex = 0;
+
+    /// hour that the client wants the delivery (minutes from midnight)
+    unsigned hour = 0;
+    /// tolerance for the delivery, after the hour, from which a delay is counted
+    unsigned tolerance = 0;
+    /// maximum tolerance for the delivery
+    unsigned max_tolerance = 0;
+    /// quantity of breads in the order
+    unsigned quantity = 0;
+    /// used for path finding, the hour that the client was visited
+    unsigned visited_at;
 
     void addEdge(Edge<T> *e);
 
@@ -85,43 +90,55 @@ public:
 
     std::vector<Edge<T> *> getOutgoing() const;
 
-    /*
-    double getX() const { return x; }
+    double getLat() const { return lat; }
 
-    double getY() const { return y; }
+    void setLat(double lat) { Vertex::lat = lat; }
 
-    void setX(double x) { this->x = x; }
+    double getLng() const { return lng; }
 
-    void setY(double y) { this->y = y; }
-     */
+    void setLng(double lng) {
+        Vertex::lng = lng;
+    }
 
-    double getLat() const;
+    unsigned int getHour() const {
+        return hour;
+    }
 
-    unsigned int getHour() const;
+    void setHour(unsigned int hour) {
+        Vertex::hour = hour;
+    }
 
-    void setHour(unsigned int hour);
+    unsigned int getTolerance() const {
+        return tolerance;
+    }
 
-    unsigned int getTolerance() const;
+    void setTolerance(unsigned int tolerance) {
+        Vertex::tolerance = tolerance;
+    }
 
-    void setTolerance(unsigned int tolerance);
+    unsigned int getMaxTolerance() const {
+        return max_tolerance;
+    }
 
-    unsigned int getMaxTolerance() const;
+    void setMaxTolerance(unsigned int maxTolerance) {
+        max_tolerance = maxTolerance;
+    }
 
-    void setMaxTolerance(unsigned int maxTolerance);
+    unsigned int getQuantity() const {
+        return quantity;
+    }
 
-    unsigned int getQuantity() const;
+    void setQuantity(unsigned int quantity) {
+        Vertex::quantity = quantity;
+    }
 
-    void setQuantity(unsigned int quantity);
+    unsigned int getVisitedAt() const {
+        return visited_at;
+    }
 
-    unsigned int getVisitedAt() const;
-
-    void setVisitedAt(unsigned int visitedAt);
-
-    void setLat(double lat);
-
-    double getLng() const;
-
-    void setLng(double lng);
+    void setVisitedAt(unsigned int visitedAt) {
+        visited_at = visitedAt;
+    }
 
     void setTimes(unsigned hour, unsigned tolerance, unsigned max_tolerance) {
         this->hour = hour;
@@ -134,27 +151,19 @@ public:
     friend class MutablePriorityQueue<Vertex<T>>;
 };
 
-/*
-template<class T>
-Vertex<T>::Vertex(T in): info(in), x(0), y(0) {}
-
-template<class T>
-Vertex<T>::Vertex(T in, double x, double y): info(in), x(x), y(y) {}
-*/
-
 template<class T>
 Vertex<T>::Vertex(T in, double lat, double lng, unsigned quantity): info(in), lat(lat), lng(lng), quantity(quantity) {}
-
-/*
-template<class T>
-Vertex<T>::Vertex(T in, double x, double y, unsigned hour, unsigned tolerance, unsigned max_tolerance): info(in), x(x), y(y), hour(hour), tolerance(tolerance), max_tolerance(max_tolerance) {}
-*/
 
 template<class T>
 Vertex<T>::Vertex(T in, double lat, double lng, unsigned hour, unsigned tolerance, unsigned max_tolerance,
                   unsigned quantity): info(in), lat(lat), lng(lng), hour(hour), tolerance(tolerance),
                                       max_tolerance(max_tolerance), quantity(quantity) {}
 
+/**
+ * Add outgoing edge to a vertex
+ *
+ * @param e pointer to the new edge
+ */
 template<class T>
 void Vertex<T>::addEdge(Edge<T> *e) {
     adj.push_back(e);
@@ -163,21 +172,42 @@ void Vertex<T>::addEdge(Edge<T> *e) {
     e->dest->adj.push_back(e);
 }
 
+/**
+ * Compare two vertices (required by MutablePriorityQueue)
+ *
+ * @param vertex the vertex to compare to
+ * @return if the vertex dist is lower
+ */
 template<class T>
 bool Vertex<T>::operator<(Vertex<T> &vertex) const {
     return this->dist < vertex.dist;
 }
 
+/**
+ * Get the info of a Vertex
+ *
+ * @return the info of a Vertex
+ */
 template<class T>
 T Vertex<T>::getInfo() const {
     return this->info;
 }
 
+/**
+ * Get the incoming edges of a Vertex
+ *
+ * @return a vector of pointers to the incoming edges of a Vertex
+ */
 template<class T>
 std::vector<Edge<T> *> Vertex<T>::getIncoming() const {
     return this->incoming;
 }
 
+/**
+ * Get the outgoing edges of a Vertex
+ *
+ * @return a vector of pointers to the outgoing edges of a Vertex
+ */
 template<class T>
 std::vector<Edge<T> *> Vertex<T>::getOutgoing() const {
     return this->outgoing;
@@ -191,9 +221,13 @@ std::vector<Edge<T> *> Vertex<T>::getOutgoing() const {
 
 template<class T>
 class Edge {
+    /// the origin vertex
     Vertex<T> *orig;
+    /// the destination vertex
     Vertex<T> *dest;
+    /// the underlying path of an edge (for interest points graphs)
     std::vector<T> complex_path;
+    /// the edge cost
     double cost;
 
 public:
@@ -203,17 +237,6 @@ public:
 
     Edge(Vertex<T> *o, Vertex<T> *d, bool lat_long);
 
-    friend class Graph<T>;
-
-    friend class Vertex<T>;
-
-    double getFlow() const;
-
-    //std::vector<Edge<T> *> getComplexPath();
-    std::vector<T> getComplexPath();
-
-    void setComplexPath(std::vector<Edge<T> *> complex_path);
-
     Vertex<T> *getOrigin() { return orig; }
 
     Vertex<T> *getDest() { return dest; }
@@ -221,6 +244,19 @@ public:
     double getCost() const { return cost; }
 
     void setCost(double cost) { this->cost = cost; }
+
+    //std::vector<Edge<T> *> getComplexPath();
+    std::vector<T> getComplexPath() {
+        return this->complex_path;
+    }
+
+    void setComplexPath(std::vector<Edge<T> *> complex_path) {
+        this->complex_path = complex_path;
+    }
+
+    friend class Graph<T>;
+
+    friend class Vertex<T>;
 };
 
 template<class T>
@@ -241,26 +277,12 @@ Edge<T>::Edge(Vertex<T> *o, Vertex<T> *d, bool lat_long):
 }
 
 template<class T>
-double Edge<T>::getFlow() const {
-    return this->flow;
-}
-
-/*
-template<class T>
-std::vector<Edge<T> *> Edge<T>::getComplexPath() {
-    return this->complex_path;
-}
- */
-
-template<class T>
-std::vector<T> Edge<T>::getComplexPath() {
-    return this->complex_path;
-}
-
-template<class T>
-void Edge<T>::setComplexPath(std::vector<Edge<T> *> complex_path) {
-    this->complex_path = complex_path;
-}
+class ClientCompare {
+public:
+    bool operator()(const Vertex<T> *v1, const Vertex<T> *v2) {
+        return v1->getHour() + v1->getMaxTolerance() < v2->getHour() + v2->getMaxTolerance();;
+    }
+};
 
 /*
  * ================================================================================================
@@ -270,13 +292,14 @@ void Edge<T>::setComplexPath(std::vector<Edge<T> *> complex_path) {
 
 template<class T>
 class Graph {
+private:
+    /// list of vertices in the graph
     std::vector<Vertex<T> *> vertexSet;
-    bool ipGraph = false; //Interest points graph
-    std::vector<std::vector<double>> distance; //Initialize only for IP Graphs
+    /// indicates if it is an interest points graph, suitable for the corresponding algorithms
+    bool ipGraph = false;
+
     unsigned start_time = 0;
     double weight = 0.5;
-
-private:
     unsigned visit_time = 5;
     unsigned early_time = 10;
     unsigned velocity = 50;
@@ -290,15 +313,15 @@ public:
 
     void heldKarp(const T &origin);
 
-    void heldKarpTimes(const T &origin);
-
-    void bruteForceTimes(const T &origin);
-
-    double bruteForceTimesBetter(const T &origin);
+    double bruteForceTimes(const T &origin);
 
     std::pair<double, std::vector<Vertex<T> *>>
-    bruteForceTimesRec(const Vertex<T> *origin, std::priority_queue<Vertex<T> *> client_queue,
-                       std::vector<Vertex<T> *> path = std::vector<Vertex<T> *>());
+    bruteForceTimesRec(Vertex<T> *origin,
+                       std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>>
+
+                       client_queue,
+                       std::vector<Vertex<T> *> path = std::vector<Vertex<T> *>()
+    );
 
     std::vector<std::vector<T>> dfsConnectivity() const;
 
@@ -314,6 +337,8 @@ public:
 
     Edge<T> *findEdge(const T &og, const T &dest) const;
 
+    Edge<T> *findEdge(const Vertex<T> *og, const Vertex<T> *dest) const;
+
     std::vector<Vertex<T> *> getVertexSet() const;
 
     unsigned int getStartTime() const;
@@ -327,6 +352,8 @@ public:
     unsigned int getEarlyTime() const;
 
     void setEarlyTime(unsigned int earlyTime);
+
+    unsigned getTotalQuantity() const {unsigned totalQuantity = 0; for(Vertex<T> * v : vertexSet) totalQuantity += v->getQuantity(); return totalQuantity;};
 
     Vertex<T> *addVertex(const T &in);
 
@@ -372,7 +399,7 @@ public:
 
     std::vector<T> getOverlapClientsTravelling(const T &info);
 
-    std::vector<Vertex<T> *> getOverlapClientsTravellingPtr(const Vertex<T> *info);
+    std::vector<Vertex<T> *> getOverlapClientsTravellingPtr(Vertex<T> *info);
 
     std::vector<T> getPerfectOverlapClientsTravelling(const T &info);
 
@@ -382,83 +409,16 @@ public:
 
     double costFunctionTotal(T og, std::vector<T> path, double weight);
 
-    double costFunctionTotalPtr(const Vertex<T>* og, std::vector<Vertex<T>*> path);
+    double costFunctionTotal(Vertex<T> *og, std::vector<Vertex<T> *> path);
 
     std::vector<T> getClusters(const T &origin);
 
-    std::vector<T> dividingClusters(std::vector<int> vans, const T &origin);
+    std::vector<std::pair<Van, std::vector<Vertex<T> *>>> dividingClustersBrute(std::vector<Van> vans, const T &origin);
+
+    std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
+    dividingClustersGreedy(std::vector<Van> vans, const T &origin);
 
 };
-
-template<class T>
-double Vertex<T>::getLat() const {
-    return lat;
-}
-
-template<class T>
-void Vertex<T>::setLat(double lat) {
-    Vertex::lat = lat;
-}
-
-template<class T>
-double Vertex<T>::getLng() const {
-    return lng;
-}
-
-template<class T>
-void Vertex<T>::setLng(double lng) {
-    Vertex::lng = lng;
-}
-
-template<class T>
-unsigned int Vertex<T>::getHour() const {
-    return hour;
-}
-
-template<class T>
-void Vertex<T>::setHour(unsigned int hour) {
-    Vertex::hour = hour;
-}
-
-template<class T>
-unsigned int Vertex<T>::getTolerance() const {
-    return tolerance;
-}
-
-template<class T>
-void Vertex<T>::setTolerance(unsigned int tolerance) {
-    Vertex::tolerance = tolerance;
-}
-
-template<class T>
-unsigned int Vertex<T>::getMaxTolerance() const {
-    return max_tolerance;
-}
-
-template<class T>
-void Vertex<T>::setMaxTolerance(unsigned int maxTolerance) {
-    max_tolerance = maxTolerance;
-}
-
-template<class T>
-unsigned int Vertex<T>::getQuantity() const {
-    return quantity;
-}
-
-template<class T>
-void Vertex<T>::setQuantity(unsigned int quantity) {
-    Vertex::quantity = quantity;
-}
-
-template<class T>
-unsigned int Vertex<T>::getVisitedAt() const {
-    return visited_at;
-}
-
-template<class T>
-void Vertex<T>::setVisitedAt(unsigned int visitedAt) {
-    visited_at = visitedAt;
-}
 
 template<class T>
 Vertex<T> *Graph<T>::addVertex(const T &in) {
@@ -575,6 +535,15 @@ Edge<T> *Graph<T>::findEdge(const T &og, const T &dest) const {
         for (auto edge : v->getOutgoing()) {
             if (edge->orig->getInfo() == og && edge->dest->getInfo() == dest) return edge;
         }
+    }
+    return nullptr;
+}
+
+template<class T>
+Edge<T> *Graph<T>::findEdge(const Vertex<T> *og, const Vertex<T> *dest) const {
+    for (auto out : og->outgoing) {
+        if (out->dest == dest)
+            return out;
     }
     return nullptr;
 }
@@ -773,11 +742,31 @@ Graph<T> Graph<T>::generateInterestPointsGraph(std::vector<T> important_points) 
     return result;
 }
 
-template<class T>
-class ClientCompare {
+class Van {
+private:
+    unsigned visit_time;
+    unsigned capacity;
+
 public:
-    bool operator()(const Vertex<T> *v1, const Vertex<T> *v2) {
-        return v1->getHour() + v1->getMaxTolerance() < v2->getHour() + v2->getMaxTolerance();;
+    Van(unsigned visit_time, unsigned capacity) {
+        this->visit_time = visit_time;
+        this->capacity = capacity;
+    }
+
+    unsigned getVisitTime() const { return this->visit_time; }
+
+    void setVisitTime(unsigned visit_time) { this->visit_time = visit_time; }
+
+    unsigned getCapacity() const { return this->capacity; }
+
+    void setCapacity(unsigned capacity) { this->capacity = capacity; }
+
+};
+
+class VanCompare {
+public:
+    bool operator()(const Van *v1, const Van *v2) {
+        return v1->getVisitTime() < v2->getVisitTime();
     }
 };
 
@@ -789,35 +778,49 @@ private:
     std::vector<Vertex<T> *> vertex_set;
 
 public:
-    Cluster(Graph<T> graph, std::vector<T> info_set){
+    Cluster(Graph<T> graph, std::vector<T> info_set) {
         this->graph = graph;
         this->info_set = info_set;
     }
 
-    std::vector<T> getInfoSet() {return info_set;}
-    std::vector<T> getVertexSet() {return vertex_set;}
-    void addInfo(T info) {info_set.push_back(info);}
+    unsigned getSize() { return info_set.size(); }
+
+    std::vector<T> getInfoSet() { return info_set; }
+
+    std::vector<T> getVertexSet() { return vertex_set; }
+
+    void addInfo(T info) { info_set.push_back(info); }
 
     void addVertex(Vertex<T> *v) {
         vertex_set.push_back(v);
         addInfo(v->info);
     }
 
-    bool isInSet(T new_info){
-        for(T info : info_set){
-            if(new_info == info) return true;
+    unsigned getTotalQuantity() const {
+        unsigned totalQuantity = 0;
+        for (T info : info_set){
+            Vertex<T> * v = graph.findVertex(info);
+            if(v == nullptr) return UINF;
+            totalQuantity += v->getQuantity();
+        }
+        return totalQuantity;
+    };
+
+    bool isInSet(T new_info) {
+        for (T info : info_set) {
+            if (new_info == info) return true;
         }
         return false;
     }
 
-    std::pair<Vertex<T> *, unsigned> getArrivalHour(){
+    std::pair<Vertex<T> *, unsigned> getArrivalHour() {
         unsigned minHour = UINF;
-        Vertex<T> * selected_vertex = nullptr;
-        for(T info : info_set){
-            Vertex<T> * vertex = graph.findVertex(info);
-            if(vertex != nullptr){
+        Vertex<T> *selected_vertex = nullptr;
+        for (T info : info_set) {
+            Vertex<T> *vertex = graph.findVertex(info);
+            if (vertex != nullptr) {
                 unsigned vertex_mh = vertex->getHour() + vertex->getTolerance();
-                if(vertex_mh < minHour){
+                if (vertex_mh < minHour) {
                     minHour = vertex_mh;
                     selected_vertex = vertex;
                 }
@@ -826,15 +829,15 @@ public:
         return std::pair<Vertex<T> *, unsigned>(selected_vertex, minHour);
     };
 
-    std::pair<Vertex<T> *, unsigned> getDepartureHour(){
+    std::pair<Vertex<T> *, unsigned> getDepartureHour() {
         unsigned maxHour = 0;
-        Vertex<T> * selected_vertex = nullptr;
-        for(T info : info_set){
-            Vertex<T> * vertex = graph.findVertex(info);
-            if(vertex != nullptr){
+        Vertex<T> *selected_vertex = nullptr;
+        for (T info : info_set) {
+            Vertex<T> *vertex = graph.findVertex(info);
+            if (vertex != nullptr) {
                 //unsigned vertex_mh = vertex->getHour() + vertex->getTolerance() + graph.getVisitTime();
                 unsigned vertex_mh = vertex->getHour() + vertex->getMaxTolerance() + graph.getVisitTime();
-                if(vertex_mh > maxHour){
+                if (vertex_mh > maxHour) {
                     maxHour = vertex_mh;
                     selected_vertex = vertex;
                 }
@@ -843,179 +846,103 @@ public:
         return std::pair<Vertex<T> *, unsigned>(selected_vertex, maxHour);
     };
 
-    Vertex<T> * getArrivalVertex(){
+    Vertex<T> *getArrivalVertex() {
         return getArrivalHour().first;
     }
 
-    Vertex<T> * getDepartureVertex(){
+    Vertex<T> *getDepartureVertex() {
         return getDepartureHour().first;
     }
 
-    unsigned getMaxArrivalHour(){
+    unsigned getMaxArrivalHour() {
         Vertex<T> *v = getArrivalHour().first;
         return v->getHour() + v->getMaxTolerance();
     }
 
     double calculateClusterCost(Cluster<T> otherCluster);
 
-    double calculateOriginCost(const T &origin, bool to_origin=false);
+    double calculateOriginCost(const T &origin, bool to_origin = false);
 
     void mergeCluster(Cluster<T> otherCluster);
 
+    bool hasCommon(Cluster<T> otherCluster);
+
 };
 
+
 template<class T>
-class ClusterCompare {
+class ClusterCompareArrival {
 public:
     bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
-        return c1->getDepartureHour() < c2->getDepartureHour();
+        return c1->getArrivalHour().second < c2->getArrivalHour().second;
     }
 };
 
 template<class T>
-void Cluster<T>::mergeCluster(Cluster<T> otherCluster){
-    for(T info : otherCluster.info_set){
-        if(!isInSet(info)) addInfo(info);
+class ClusterCompareDeparture {
+public:
+    bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
+        return c1->getDepartureHour().second < c2->getDepartureHour().second;
+    }
+};
+
+template<class T>
+class ClusterCompareSize {
+public:
+    bool operator()(const Cluster<T> *c1, const Cluster<T> *c2) {
+        return c1->getSize() > c2->getSize();
+    }
+};
+
+template<class T>
+void Cluster<T>::mergeCluster(Cluster<T> otherCluster) {
+    for (T info : otherCluster.info_set) {
+        if (!isInSet(info)) addInfo(info);
     }
 }
 
 template<class T>
-double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster){
+bool Cluster<T>::hasCommon(Cluster<T> otherCluster) {
+    for (T info : info_set) {
+        for (T other_info : otherCluster.getInfoSet()) {
+            if (other_info == info) return true;
+        }
+    }
+    return false;
+}
+
+template<class T>
+double Cluster<T>::calculateClusterCost(Cluster<T> otherCluster) {
     std::pair<Vertex<T> *, unsigned> departure = getDepartureHour();
     std::pair<Vertex<T> *, unsigned> arrival = otherCluster.getArrivalHour();
-    if(arrival.first == nullptr || departure.first == nullptr) return INF;
+    if (arrival.first == nullptr || departure.first == nullptr) return INF;
 
-    Edge<T> * edge = graph.findEdge(departure.first->getInfo(), arrival.first->getInfo());
-    if(edge == nullptr) return INF;
+    Edge<T> *edge = graph.findEdge(departure.first->getInfo(), arrival.first->getInfo());
+    if (edge == nullptr) return INF;
 
     double travelling_time = edge->getCost() / graph.getVelocity();
-    if(departure.second + travelling_time <= arrival.second) return 0;
+    if (departure.second + travelling_time <= arrival.second) return 0;
     else if (departure.second + travelling_time > otherCluster.getMaxArrivalHour()) return INF;
     else return departure.second + travelling_time - arrival.second;
 }
 
 
 template<class T>
-double Cluster<T>::calculateOriginCost(const T &origin, bool to_origin){
-    if(to_origin){
-        Edge<T> * edge = graph.findEdge(getDepartureVertex()->info, origin);
-        if(edge == nullptr) return INF;
+double Cluster<T>::calculateOriginCost(const T &origin, bool to_origin) {
+    if (to_origin) {
+        Edge<T> *edge = graph.findEdge(getDepartureVertex()->info, origin);
+        if (edge == nullptr) return INF;
         return edge->getCost();
-    }
-    else{
+    } else {
         std::pair<Vertex<T> *, unsigned> arrival = getArrivalHour();
-        Edge<T> * edge = graph.findEdge(origin, arrival.first->getInfo());
-        if(edge == nullptr) return -1;
+        Edge<T> *edge = graph.findEdge(origin, arrival.first->getInfo());
+        if (edge == nullptr) return -1;
         double delay = graph.getStartTime() + edge->getCost() - arrival.second;
-        if(delay < 0) return 0;
-        if(graph.getStartTime() + edge->getCost() > getMaxArrivalHour()) return INF;
+        if (delay < 0) return 0;
+        if (graph.getStartTime() + edge->getCost() > getMaxArrivalHour()) return INF;
         return delay;
     }
 }
-
-template<class T>
-void Graph<T>::heldKarpTimes(const T &origin) {
-    //Initialize vertices vector with origin in last place
-    Vertex<T> *orig = findVertex(origin);
-    if (orig == nullptr) {
-        std::cout << "[Held-Karp] Invalid origin!\n";
-        return;
-    }
-    std::vector<Vertex<T> *> vertices = vertexSet;
-    vertices.erase(std::find(vertices.begin(), vertices.end(), orig));
-    vertices.push_back(orig);
-
-    //Build distance matrix
-    std::cout << "[Held-Karp] Building distance matrix...\n";
-    std::vector<std::vector<double>> distance(vertices.size(), std::vector<double>(vertices.size(), 0));
-    std::vector<Edge<T> *> edges;
-    bool found_edge = false;
-    for (unsigned i = 0; i < vertices.size(); i++) {
-        edges = vertices.at(i)->outgoing;
-        for (unsigned j = 0; j < vertices.size(); j++) {
-            if (i == j) continue;
-            for (auto edge = edges.begin(); edge < edges.end(); edge++) {
-                if ((*edge)->dest == vertices.at(j)) {
-                    distance.at(i).at(j) = (*edge)->cost;
-                    edges.erase(edge);
-                    found_edge = true;
-                    break;
-                }
-            }
-            if (!found_edge) {
-                std::cout << "[Held-Karp] No edge connecting " << vertices.at(i)->info << " to "
-                          << vertices.at(j)->info << "!\n";
-                return;
-            }
-        }
-    }
-
-    std::priority_queue<Vertex<T> *, std::vector<Vertex<T>>, ClientCompare<T>> client_queue;
-    for (auto v : vertexSet) {
-        if (v->info == origin) continue;
-        client_queue.push(v);
-    }
-
-    std::cout << "[Held-Karp] Calculate shortest paths...\n";
-    //Initialize best distance and corresponding path vectors
-    std::vector<std::vector<unsigned>> best(1 << (vertices.size() - 1),
-                                            std::vector<unsigned>(vertices.size(), UINT_MAX));
-    std::vector<std::vector<unsigned>> path(1 << (vertices.size() - 1),
-                                            std::vector<unsigned>(vertices.size(), UINT_MAX));
-    unsigned temp_dist;
-    //Iterate through combinations of vertices encoded in bits
-    for (unsigned visited = 1; visited < (1 << vertices.size() - 1); visited++) {
-        //Iterate through the possible last vertices in a path
-        for (unsigned last = 0; last < vertices.size() - 1; last++) {
-            //The last vertices for a certain visited combination need to be part of that combination
-            if (!(visited & 1 << last)) continue;
-
-            //If there is only one vertex in visited, the minimum distance is the one from the origin to last
-            if (visited == 1 << last) {
-                best.at(visited).at(last) = distance.at(vertices.size() - 1).at(last);
-                path.at(visited).at(last) = vertices.size() - 1;
-            } else {
-                unsigned prev_visited = visited ^(1 << last); //possible previous visited indexes
-                for (unsigned cand_prev = 0; cand_prev < vertices.size() - 1; cand_prev++) {
-                    if (!(prev_visited & 1 << cand_prev)) continue; //discard impossible previous indexes
-                    temp_dist = best.at(prev_visited).at(cand_prev) + distance.at(cand_prev).at(last);
-                    if (temp_dist < best.at(visited).at(last)) {
-                        best.at(visited).at(last) = temp_dist;
-                        path.at(visited).at(last) = cand_prev;
-                    }
-                }
-            }
-        }
-    }
-
-    std::cout << "[Held-Karp] Calculate final shortest path...\n";
-    //Get the cheapest path from the precomputed path lengths using all but the origin vertex
-    unsigned final_dist, second_to_last;
-    for (unsigned last = 0; last < vertices.size() - 1; last++) {
-        temp_dist = best.at((1 << (vertices.size() - 1)) - 1).at(last) + distance.at(last).at(vertices.size() - 1);
-        if (temp_dist < final_dist) {
-            final_dist = temp_dist;
-            second_to_last = last;
-        }
-    }
-
-    std::cout << "[Held-Karp] Populate path and dist attributes...\n";
-    //Populate the path and dist attribute in the vertices
-    unsigned last = second_to_last, visited = (1 << (vertices.size() - 1)) - 1, temp_last;
-    vertices.at(vertices.size() - 1)->path = vertices.at(second_to_last);
-    vertices.at(vertices.size() - 1)->dist = distance.at(second_to_last).at(vertices.size() - 1);
-    for (unsigned i = 0; i < vertices.size() - 1; i++) {
-        vertices.at(last)->path = vertices.at(path.at(visited).at(last));
-        vertices.at(last)->dist = distance.at(path.at(visited).at(last)).at(last);
-        temp_last = path.at(visited).at(last);
-        visited ^= (1 << last);
-        last = temp_last;
-    }
-    if (visited == 0) {
-        std::cout << "[Held-Karp] All good!\n";
-    } else std::cout << "[Held-Karp] All is not good :)!\n";
-}
-
 
 template<class T>
 void Graph<T>::heldKarp(const T &origin) {
@@ -1114,73 +1041,8 @@ void Graph<T>::heldKarp(const T &origin) {
     } else std::cout << "[Held-Karp] All is not good :)!\n";
 }
 
-/*
 template<class T>
-void Graph<T>::bruteForceTimes(const T &origin) {
-    Vertex<T> *orig = findVertex(origin);
-    if (orig == nullptr) {
-        std::cout << "[Brute Force] Invalid origin!\n";
-        return;
-    }
-
-    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> client_queue;
-    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> temp_queue;
-    //std::vector<T> vertices;
-
-    for (Vertex<T> *v : vertexSet) {
-        if (v->info != origin){
-            client_queue.push(v);
-            //vertices.push_back(v->info);
-        }
-    }
-
-    unsigned client_no = client_queue.size();
-
-
-    std::vector<std::vector<unsigned>> step_matrix(pow(client_no, 2), std::vector<unsigned>(client_no + 2, 0));
-    std::vector<unsigned> temp_path(client_no, 0);
-
-    std::vector<T> overlap = getOverlapClientsTravelling(client_queue.top());
-
-    for(int i = 0; i < overlap.size(); i++){
-        temp_queue = client_queue;
-        step_matrix[i][0] = overlap[i];
-        if(overlap[i] != temp_queue.top()) step_matrix[i][1] = temp_queue.top();
-        else{
-            temp_queue.pop();
-            step_matrix[i][1] = temp_queue.top();
-        }
-        step_matrix[i][2] = i + 1;
-    }
-
-    int counter = 0;
-    int level = 2;
-    int max_step = overlap.size();
-    int old_max_step = max_step;
-    int past_step = 0;
-    while(counter < client_no){
-        temp_queue = client_queue;
-        int old_max_step = max_step;
-        for(int i = past_step; i < old_max_step; i++){
-            temp_queue = client_queue;
-            while(temp_queue.top() != step_matrix[past_step][1]) temp_queue.pop();
-            overlap =  getOverlapClientsTravelling(temp_queue.top());
-
-            while(!overlap.empty()){
-                max_step++;
-                step_matrix[max_step][level] = past_step;
-                step_matrix[max_step][level + 1] = max_step;
-
-            }
-
-        }
-
-    }
-}
-*/
-
-template<class T>
-double Graph<T>::bruteForceTimesBetter(const T &origin) {
+double Graph<T>::bruteForceTimes(const T &origin) {
     Vertex<T> *orig = findVertex(origin);
     if (orig == nullptr) {
         std::cout << "[Brute Force] Invalid origin!\n";
@@ -1194,30 +1056,63 @@ double Graph<T>::bruteForceTimesBetter(const T &origin) {
             client_queue.push(v);
     }
 
-    std::pair<double, std::vector<Vertex<T> *>> res = bruteForceTimesRec(orig, client_queue);
+    std::vector<Vertex<T> *> path;
 
-    std::vector<Vertex<T> *> path = res.second;
+    std::pair<double, std::vector<Vertex<T> *>> res = bruteForceTimesRec(orig, client_queue, path);
+
+    path = res.second;
     if (path.size() > 0)
         res.second.at(0)->path = orig;
     for (int i = 1; i < path.size(); i++) {
-        path.at(i)->path = path.at(i - 1); //TODO: NOT FILLING DISTS (should we?)
+        path.at(i)->path = path.at(i - 1);
     }
     orig->path = path.at(path.size() - 1);
+
+    unsigned current_time = start_time;
+    Edge<T> *edge;
+
+    if (path.size() > 0) {
+        edge = findEdge(orig, path.at(0));
+        if (edge == nullptr) {
+            std::cout << "[Brute Force Times] Couldn't find edge!\n";
+            return res.first;
+        } else {
+            current_time += edge->cost / velocity;
+            if (current_time < edge->dest->hour - early_time) { //arrived early
+                current_time = edge->dest->hour - early_time;
+            }
+            path.at(0)->visited_at = current_time;
+            current_time += visit_time;
+            path.at(0)->dist = edge->cost;
+        }
+    }
+
+    for (int i = 1; i < path.size(); i++) {
+        edge = findEdge(orig, res.second.at(0));
+        current_time += edge->cost / velocity;
+        if (current_time < edge->dest->hour - early_time) { //arrived early
+            current_time = edge->dest->hour - early_time;
+        }
+        path.at(0)->visited_at = current_time;
+        current_time += visit_time;
+        path.at(0)->dist = edge->cost;
+    }
 
     return res.first;
 }
 
 template<class T>
 std::pair<double, std::vector<Vertex<T> *>>
-Graph<T>::bruteForceTimesRec(const Vertex<T> *origin, std::priority_queue<Vertex<T> *> client_queue,
+Graph<T>::bruteForceTimesRec(Vertex<T> *origin,
+                             std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> client_queue,
                              std::vector<Vertex<T> *> path) {
     if (client_queue.empty())
-        return std::pair<double, std::vector<Vertex<T> *>>(costFunctionTotalPtr(origin, path));
+        return std::pair<double, std::vector<Vertex<T> *>>(costFunctionTotal(origin, path), path);
     Vertex<T> *next_min = client_queue.top();
-    Vertex<T> *overlapping = getOverlapClientsTravellingPtr(next_min);
+    std::vector<Vertex<T> *> overlapping = getOverlapClientsTravellingPtr(next_min);
     std::vector<Vertex<T> *> temp_clients;
     std::vector<Vertex<T> *> temp_path;
-    std::priority_queue<Vertex<T> *> temp_queue;
+    std::priority_queue<Vertex<T> *, std::vector<Vertex<T> *>, ClientCompare<T>> temp_queue;
     double min_cost = INF;
     std::vector<Vertex<T> *> min_path;
     std::pair<double, std::vector<Vertex<T> *>> res;
@@ -1308,10 +1203,10 @@ void Graph<T>::nearestNeighbourTimes(const T &origin_info) {
             current_time = chosen_edge->dest->hour - early_time;
             std::cout << "[Nearest Neighbour Times] Too early, waiting until " << current_time << ".\n";
         }
+        next_vertex->visited_at = current_time;
         current_time += visit_time;
         next_vertex->visited = true;
         next_vertex->dist = dist;
-        next_vertex->visited_at = current_time;
         next_vertex->path = adj.at(0)->orig;
         std::cout << "[Nearest Neighbour Times] Delivered to client " << next_vertex->info << ", leaving at "
                   << current_time << "\n";
@@ -1630,8 +1525,8 @@ void Graph<T>::printTimes() {
     for (auto vertex : vertexSet) {
         if (vertex->hour > 0) {
             unsigned delta_time = vertex->visited_at - vertex->hour;
-            std::cout << "V" << vertex->info << ": tol= " << vertex->tolerance << " | max_tol= "
-                      << vertex->max_tolerance << " | hour= " << vertex->hour << " | visited_at= " << vertex->visited_at
+            std::cout << "V" << vertex->info << ": tol= " << vertex->tolerance << " | hour= " << vertex->hour
+                      << " | visited_at= " << vertex->visited_at
                       << " | delta= " << delta_time << std::endl;
         }
     }
@@ -1702,14 +1597,14 @@ std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(const T &info) {
 
 
 template<class T>
-std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(std::vector<T> remaining_clients, const T &info){
+std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(std::vector<T> remaining_clients, const T &info) {
     std::vector<T> overlap;
     Vertex<T> *vertex = findVertex(info);
     if (vertex == nullptr) return overlap;
     overlap.push_back(info);
     unsigned sup_lim = vertex->hour + vertex->tolerance;
     for (T vinfo : remaining_clients) {
-        Vertex<T> * v = findVertex(vinfo);
+        Vertex<T> *v = findVertex(vinfo);
         if (v != nullptr && v->info != vertex->info && v->hour > 0 && v->max_tolerance > 0) {
             Edge<T> *edge = findEdge(v->info, vertex->info);
             double travelling_time = 0.0;
@@ -1723,22 +1618,22 @@ std::vector<T> Graph<T>::getPerfectOverlapClientsTravelling(std::vector<T> remai
 }
 
 template<class T>
-std::vector<T> Graph<T>::getClusters(const T &origin){
+std::vector<T> Graph<T>::getClusters(const T &origin) {
     Vertex<T> *orig = findVertex(origin);
+    std::vector<Cluster<T>> result;
     if (orig == nullptr) {
         std::cout << "[Clusters] Invalid origin!\n";
-        return;
+        return result;
     }
 
-    std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompare<T>> cluster_queue;
-    //std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompare<T>> temp_queue;
+    std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareDeparture<T>> cluster_queue;
+    //std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareDeparture<T>> temp_queue;
     std::vector<Cluster<T>> temp_clusters;
-    std::vector<Cluster<T>> result;
     std::vector<T> temp;
 
     for (Vertex<T> *v : vertexSet) {
         temp.clear();
-        if (v->info != origin){
+        if (v->info != origin) {
             temp.push(v);
             Cluster<T> cluster(this, temp);
             cluster_queue.push(cluster);
@@ -1747,47 +1642,46 @@ std::vector<T> Graph<T>::getClusters(const T &origin){
 
     Cluster<T> main_cluster = Cluster<T>(this, {});
 
-    while(!cluster_queue.empty()){
+    while (!cluster_queue.empty()) {
         temp_clusters.clear();
         main_cluster = cluster_queue.pop();
-        while(!cluster_queue.empty()){
+        while (!cluster_queue.empty()) {
             Cluster<T> other_cluster = cluster_queue.top();
-            if(main_cluster.calculateClusterCost(other_cluster) == 0){
+            if (main_cluster.calculateClusterCost(other_cluster) == 0) {
                 main_cluster.mergeCluster(other_cluster);
-            }
-            else{
+            } else {
                 temp_clusters.push_back(other_cluster);
             }
             cluster_queue.pop();
         }
-        for(Cluster<T> c : temp_clusters) cluster_queue.push(c);
+        for (Cluster<T> c : temp_clusters) cluster_queue.push(c);
         result.push_back(main_cluster);
     }
 
     return result;
 }
 
+template<class T>
+class ClusterPairCompare {
+public:
+    bool operator()(const std::pair<std::vector<Cluster<T>>, double> *cp1,
+                    const std::pair<std::vector<Cluster<T>>, double> *cp2) {
+        return cp1->second < cp2->second;
+    }
+};
+
 //TODO: Make a Van class and implement it here! (Change VisitTime everywhere)
 template<class T>
-std::vector<std::pair<int, std::vector<Vertex<T> *>>> Graph<T>::dividingClusters(std::vector<int> vans, const T &origin){
+std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
+Graph<T>::dividingClustersBrute(std::vector<Van> vans, const T &origin) {
     std::vector<Cluster<T>> clusters = getClusters(origin);
     unsigned vans_no = vans.size();
     std::vector<Vertex<T> *> vertices;
-    std::vector<std::pair<int, std::vector<Vertex<T> *>>> result_pairs;
+    std::vector<Cluster<T>> final_clusters;
+    std::vector<std::pair<Van, std::vector<Vertex<T> *>>> result_pairs;
 
-    if(clusters.size() <= vans_no){
-        int vcounter = 0; //temporary. To be changed...
-        //TODO: Mut Priority Queue of Vans ordered by VisitTime
-        for(Cluster<T> cluster : clusters){
-            vertices.clear();
-            for(T info : cluster.getInfoSet()){
-                Vertex<T> * v = findVertex(info);
-                if(v != nullptr) vertices.push_back(v);
-            }
-            result_pairs.push_back(std::pair<int, std::vector<Vertex<T> *>>(vans[vcounter], vertices));
-        }
-    }
-    else{
+    if (clusters.size() > vans_no) {
+        /*
         std::vector<std::vector<double>> cost_matrix(clusters.size() + 1, std::vector<double>(clusters.size() + 1, INF));
         for(int i = 0; i < clusters.size() + 1; i++){
             if(i != 0){
@@ -1801,20 +1695,165 @@ std::vector<std::pair<int, std::vector<Vertex<T> *>>> Graph<T>::dividingClusters
                 cost_matrix[row][col] = clusters[row - 1].calculateClusterCost(clusters[col - 1]);
             }
         }
+         */
+        std::vector<double> from_origin_cost(clusters.size(), INF);
+        std::vector<double> to_origin_cost(clusters.size(), INF);
 
-        //TODO: Decide how to use cost_matrix between clusters to divide them in vans
+        for (int i = 0; i < clusters.size(); i++) {
+            from_origin_cost[i] = clusters[i].calculateClusterCost(origin);
+            to_origin_cost[i] = clusters[i].calculateClusterCost(origin, true);
+        }
+
+        int connections = clusters.size() - vans.size();
+        std::priority_queue<std::pair<std::vector<Cluster<T>>, double>, std::vector<std::pair<std::vector<Cluster<T>>, double>>, ClusterPairCompare<T>> cluster_connections;
+        std::vector<Cluster<T>> connection;
 
 
+        for (int row = 0; row < clusters.size(); row++) {
+            for (int col = 0; col < clusters.size(); col++) {
+                if (row != col) {
+                    std::vector<double> from_cost = from_origin_cost;
+                    std::vector<double> to_cost = to_origin_cost;
+                    to_cost[col] = clusters[row].calculateClusterCost(clusters[col]);
+                    from_cost[row] = 0.0;
+                    double con_cost = std::accumulate(from_cost.begin(), from_cost.end(), 0.0) +
+                                      std::accumulate(to_cost.begin(), to_cost.end(), 0.0);
+                    connection.clear();
+                    connection.push_back(clusters[row]);
+                    connection.push_back(clusters[col]);
+                    cluster_connections.push(std::pair<std::vector<Cluster<T>>, double>(connection, con_cost));
+                }
+            }
+        }
 
+        std::vector<std::pair<Cluster<T>, Cluster<T> >> cluster_pairs;
+        for (int i = 0; i < connections; i++) {
+            std::vector<Cluster<T>> cluster_con = cluster_connections.pop().first;
+            cluster_pairs.push_back(std::pair<Cluster<T>, Cluster<T> >(cluster_con[0], cluster_con[1]));
+        }
+        for (Cluster<T> cluster : clusters) {
+            bool found = false;
+            for (std::pair<Cluster<T>, Cluster<T> > cp : cluster_pairs) {
+                if (cluster.getInfoSet() == cp.first.getInfoSet() || cluster.getInfoSet() == cp.second.getInfoSet()) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) final_clusters.push_back(cluster);
+        }
+
+        /*
+        for(auto i = cluster_pairs.begin(); i < cluster_pairs.end() - 1; i++){
+            for(auto j = i + 1; j < cluster_pairs.end(); j++){
+                std::pair< Cluster<T>, Cluster<T> > cp1 = cluster_pairs[i];
+                std::pair< Cluster<T>, Cluster<T> > cp2 = cluster_pairs[j];
+                if(cp1.first == cp2.first || cp1.first == cp2.second || cp1.second == cp2.first || cp1.second == cp2.second){
+                    Cluster<T> merge_cluster = cp1.first.mergeCluster(cp1.second);
+                    merge_cluster.mergeCluster(cp2.first);
+                    merge_cluster.mergeCluster(cp2.second);
+
+                }
+            }
+        }
+         */
+        std::vector<Cluster<T>> merging_pairs;
+        for (int i = 0; i < cluster_pairs.size(); i++) {
+            merging_pairs.push_back(cluster_pairs[i].first.mergeCluster(cluster_pairs[i].second));
+        }
+
+        while (!merging_pairs.empty()) {
+            Cluster<T> c = merging_pairs.back();
+            merging_pairs.pop_back();
+            bool merged = false;
+            for (int i = 0; i < merging_pairs.size(); i++) {
+                if (merging_pairs[i].hasCommon(c)) {
+                    merging_pairs[i] = merging_pairs[i].mergeCluster(c);
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) final_clusters.push_back(c);
+        }
+
+    } else {
+        final_clusters = clusters;
     }
 
+    std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareSize<T>> final_cluster_queue;
+    std::priority_queue<Van, std::vector<Van>, VanCompare> van_queue;
+    for (Van van : vans) {
+        van_queue.push(van);
+    }
+
+    for (Cluster<T> cluster : final_clusters) {
+        final_cluster_queue.push(cluster);
+    }
+    //int vcounter = 0;
+    while (!final_cluster_queue.empty()) {
+        Cluster<T> cluster = final_cluster_queue.pop();
+        vertices.clear();
+        for (T info : cluster.getInfoSet()) {
+            Vertex<T> *v = findVertex(info);
+            if (v != nullptr) vertices.push_back(v);
+        }
+        //result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(vans[vcounter], vertices));
+        result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(van_queue.pop(), vertices));
+    }
 
     return result_pairs;
 }
 
 
 template<class T>
-std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravellingPtr(const Vertex<T>* info) {
+std::vector<std::pair<Van, std::vector<Vertex<T> *>>>
+Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
+    std::vector<Cluster<T>> clusters = getClusters(origin);
+    unsigned vans_no = vans.size();
+    std::vector<Vertex<T> *> vertices;
+    std::vector<Cluster<T>> final_clusters;
+    std::vector<std::pair<Van, std::vector<Vertex<T> *>>> result_pairs;
+
+    if (clusters.size() > vans_no) {
+        std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareArrival<T>> arrival_cluster_queue;
+        std::vector<Cluster<T>> van_clusters(vans_no, Cluster<T>(this, {}));
+        int vcounter = 0;
+        while(!arrival_cluster_queue.empty()){
+            van_clusters[vcounter] = van_clusters[vcounter].mergeCluster(arrival_cluster_queue.pop());
+            vcounter++;
+            if(vcounter >= vans_no) vcounter = 0;
+        }
+        final_clusters = van_clusters;
+    } else {
+        final_clusters = clusters;
+    }
+
+    std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareSize<T>> final_cluster_queue;
+    std::priority_queue<Van, std::vector<Van>, VanCompare> van_queue;
+    for (Van van : vans) {
+        van_queue.push(van);
+    }
+
+    for (Cluster<T> cluster : final_clusters) {
+        final_cluster_queue.push(cluster);
+    }
+    //int vcounter = 0;
+    while (!final_cluster_queue.empty()) {
+        Cluster<T> cluster = final_cluster_queue.pop();
+        vertices.clear();
+        for (T info : cluster.getInfoSet()) {
+            Vertex<T> *v = findVertex(info);
+            if (v != nullptr) vertices.push_back(v);
+        }
+        //result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(vans[vcounter], vertices));
+        result_pairs.push_back(std::pair<Van, std::vector<Vertex<T> *>>(van_queue.pop(), vertices));
+    }
+
+    return result_pairs;
+}
+
+
+template<class T>
+std::vector<Vertex<T> *> Graph<T>::getOverlapClientsTravellingPtr(Vertex<T> *info) {
     std::vector<Vertex<T> *> overlap;
     if (info == nullptr) return overlap;
     overlap.push_back(info);
@@ -1888,58 +1927,17 @@ double Graph<T>::costFunctionStep(T og, std::vector<T> path, T new_element, doub
 
 template<class T>
 double Graph<T>::costFunctionTotal(T og, std::vector<T> path, double weight) {
-    if (weight < 0 || weight > 1) return -1;
-    if (path.size() == 0) return -1;
-
-    std::vector<unsigned> delays;
-
-    unsigned current_time = start_time;
-    unsigned delay = 0;
-    double total_delay = 0;
-
-    double average; //f
-    double deviation; //g
-
-    T first;
-    T second;
-    Edge<T> *edge;
-    Vertex<T> *current_v;
 
     Vertex<T> *origin = findVertex(og);
-    if (origin == nullptr) return -1;
-
-    for (int i = 0; i < path.size(); i++) {
-        if (i == 0) first = origin->info;
-        else first = path[i - 1];
-        second = path[i];
-        edge = findEdge(first, second);
-        current_v = findVertex(second);
-        if (edge == nullptr || current_v == nullptr) return -1;
-        delay = (current_time + edge->cost / velocity) - current_v->hour;
-        if (delay < current_v->tolerance) delay = 0;
-        if (delay > current_v->max_tolerance) return INF;
-        delays.push_back(delay);
-        total_delay += delay;
-        if (current_time + edge->cost / velocity < current_v->hour - early_time)
-            current_time = current_v->hour - early_time + visit_time;
-        else current_time += edge->cost / velocity + visit_time;
+    std::vector<Vertex<T> *> ptr_path;
+    for (auto v : path) {
+        ptr_path.push_back(findVertex(v));
     }
-
-    double vertex_no = path.size();
-    average = total_delay / vertex_no;
-
-    double deviation_sum = 0;
-    for (int i = 0; i < delays.size(); i++) {
-        deviation_sum += pow(delays[i] - average, 2);
-    }
-    deviation = sqrt((1 / vertex_no) * deviation_sum);
-
-    double cost = weight * average + (1 - weight) * deviation;
-    return cost;
+    return costFunctionTotal(origin, ptr_path);
 }
 
 template<class T>
-double Graph<T>::costFunctionTotalPtr(const Vertex<T> *origin, std::vector<Vertex<T> *> path) {
+double Graph<T>::costFunctionTotal(Vertex<T> *origin, std::vector<Vertex<T> *> path) {
     if (weight < 0 || weight > 1) return -1;
     if (path.size() == 0) return -1;
 

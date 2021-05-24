@@ -226,8 +226,8 @@ void mainMenu() {
 }
 
 int main() {
-    mainMenu();
-    return 0;
+    //mainMenu();
+    //return 0;
 
     cout << "Start" << endl;
 
@@ -281,15 +281,32 @@ int main() {
     minig.findVertex(62)->setTimes(140, 5, 10);
      */
 
-    vector<unsigned> ov = minig.getOverlapClients(26806);
-    vector<unsigned> ovt = minig.getOverlapClientsTravelling(26806);
+    //vector<unsigned> ov = minig.getOverlapClients(26806);
+    //vector<unsigned> ovt = minig.getOverlapClientsTravelling(26806);
+
+    cout << "Running Nearest Neighbour Times..." << endl;
+    minig.nearestNeighbourTimes(11);
+    cout << "Getting path..." << endl;
+    pair<vector<unsigned>, double> nnt_path = minig.getPath(11, 11);
+
+    cout << "GraphViewer..." << endl;
+    minig.viewGraphPath(nnt_path.first, ids, true, true, true, true);
+
+    cout << "Running Brute Force Times..." << endl;
+    minig.bruteForceTimes(11);
+    cout << "Getting path..." << endl;
+    pair<vector<unsigned>, double> bf_path = minig.getPath(11, 11);
+
+    cout << "GraphViewer..." << endl;
+    minig.viewGraphPath(bf_path.first, ids, true, true, true, true);
+
+    return 0;
 
     cout << "Running Held-Karp..." << endl;
     minig.heldKarp(11);
 
     cout << "Getting path..." << endl;
     pair<vector<unsigned>, double> hk_path = minig.getPath(11, 11);
-
 
     cout << "GraphViewer..." << endl;
 
@@ -299,8 +316,8 @@ int main() {
     }
     */
 
-    PrintVector(ov, "OV[26806]");
-    PrintVector(ovt, "OVT[26806]");
+    //PrintVector(ov, "OV[26806]");
+    //PrintVector(ovt, "OVT[26806]");
 
 
     //minig.viewGraphPath(hk_path.first, ids, false, true);
@@ -308,16 +325,15 @@ int main() {
 
     //g.viewGraphPathIP(minig, hk_path.first, true, true);
 
-    minig.viewGraphPath(hk_path.first, ids, true, true, true);
+    minig.viewGraphPath(hk_path.first, ids, true, true, true, true);
 
     cout << "Running Nearest Neighbour..." << endl;
-    //minig.nearestNeighbour(11);
-    minig.nearestNeighbourTimes(11);
+    minig.nearestNeighbour(11);
     cout << "Getting path..." << endl;
     pair<vector<unsigned>, double> nn_path = minig.getPath(11, 11);
 
     cout << "GraphViewer..." << endl;
-    minig.viewGraphPath(nn_path.first, ids, true, true, true);
+    minig.viewGraphPath(nn_path.first, ids, true, true, true, true);
 
     cout << "HK: " << hk_path.second << " vs NN: " << nn_path.second << endl;
     minig.printTimes();
