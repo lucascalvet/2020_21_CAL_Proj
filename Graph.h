@@ -18,7 +18,7 @@
 
 constexpr auto INF = std::numeric_limits<double>::max();
 constexpr auto UINF = std::numeric_limits<unsigned>::max();
-constexpr double LATLNG_FACTOR = 100.0;
+constexpr double LATLNG_FACTOR = 50000.0;
 
 class Van;
 
@@ -66,7 +66,6 @@ private:
     double dist = INF;
     /// required by MutablePriorityQueue
     int queueIndex = 0;
-
     /// hour that the client wants the delivery (minutes from midnight)
     unsigned hour = 0;
     /// tolerance for the delivery, after the hour, from which a delay is counted
@@ -260,6 +259,8 @@ class Edge {
     std::vector<T> complex_path;
     /// the edge cost
     double cost;
+    /// required to view Van Paths in GraphViewer
+    int vanID = 0;
 
 public:
     Edge(Vertex<T> *o, Vertex<T> *d, double cost, std::vector<T> complex_path);
@@ -271,6 +272,10 @@ public:
     Vertex<T> *getOrigin() { return orig; }
 
     Vertex<T> *getDest() { return dest; }
+
+    int getVanID() { return vanID; }
+
+    void setVanID(int vanID) { this->vanID = vanID; }
 
     double getCost() const { return cost; }
 
@@ -336,6 +341,7 @@ private:
     std::vector<Vertex<T> *> vertexSet;
     /// indicates if it is an interest points graph, suitable for the corresponding algorithms
     bool ipGraph = false;
+    bool latLng = true;
 
     unsigned start_time = 0;
     double weight = 0.5;
@@ -388,6 +394,10 @@ public:
 
     unsigned int getVisitTime() const;
 
+    bool getLatLng() const { return this->lat_lng; }
+
+    void setLatLng(bool lat_lng) { this->lat_lng = lat_lng; }
+
     void setVisitTime(unsigned int visitTime);
 
     unsigned int getEarlyTime() const;
@@ -422,15 +432,15 @@ public:
 
     void setVelocity(unsigned velocity) { this->velocity = velocity; }
 
-    void viewGraph(bool lat_lng=true);
+    void viewGraph();
 
-    void viewGraphIP(const Graph<T> &igraph, bool lat_lng=true);
+    void viewGraphIP(const Graph<T> &igraph);
 
-    void viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool lat_lng=true, bool remove_extra_nodes = false,
-                       bool remove_extra_edges = false, bool show_w = false, bool show_nid = false);
+    void viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool remove_extra_nodes = false,
+                       bool remove_extra_edges = false, bool show_w = false, bool show_nid = false, bool multiple_vans = true);
 
-    void viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool lat_lng=true, bool remove_extra_nodes = false,
-                         bool remove_extra_edges = false, bool show_w = false, bool show_nid = false);
+    void viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool remove_extra_nodes = false,
+                         bool remove_extra_edges = false, bool show_w = false, bool show_nid = false, bool multiple_vans = true);
 
     void importGraph(std::string vertex_filename, std::string edges_filename, bool lat_lng);
 
@@ -460,6 +470,8 @@ public:
     dividingClustersGreedy(std::vector<Van> vans, const T &origin);
 
     void followVansPath(std::vector<std::pair<Van, std::vector<Vertex<T> *>>> paths_dist, const T &og);
+
+    std::vector<T> vanPathtoViewPath(std::vector<std::pair<Van, std::vector<Vertex<T > *>>> van_path, const T &og);
 
 };
 
@@ -1331,6 +1343,7 @@ void Graph<T>::nearestNeighbourTimes(const T &origin_info) {
 //TODO: I think we should change this to a constructor. Or else it just adds on top of the current map...
 template<class T>
 void Graph<T>::importGraph(std::string vertex_filename, std::string edges_filename, bool lat_lng) {
+    latLng = lat_lng;
     std::ifstream vertex_file(vertex_filename);
     std::ifstream edge_file(edges_filename);
     if (vertex_file.fail() || edge_file.fail()) {
@@ -1367,10 +1380,13 @@ void Graph<T>::importGraph(std::string vertex_filename, std::string edges_filena
 }
 
 template<class T>
-void Graph<T>::viewGraph(bool lat_lng) {
+void Graph<T>::viewGraph() {
     // Instantiate GraphViewer
     GraphViewer gv;
     double factor = 1.0;
+    double lat_shift = 0.0;
+    double lng_shift = 0.0;
+    bool lat_lng = latLng;
     if(lat_lng) factor = LATLNG_FACTOR;
 
     // Set coordinates of window center
@@ -1379,8 +1395,19 @@ void Graph<T>::viewGraph(bool lat_lng) {
     unsigned vcounter = 1;
     std::stringstream ss;
     for (auto vertex : getVertexSet()) {
+        if(lat_lng){
+            lat_shift = vertex->getLat();
+            lng_shift = vertex->getLng();
+            /*
+            if(vertex->getLat() > 0) lat_shift = floor(vertex->getLat());
+            else lat_shift = ceil(vertex->getLat());
+            if(vertex->getLng() > 0) lng_shift = floor(vertex->getLng());
+            else lng_shift = ceil(vertex->getLng());
+             */
+            lat_lng = false;
+        }
         ss << vcounter;
-        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getLat() * factor, vertex->getLng() * factor));
+        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f((vertex->getLat() - lat_shift) * factor, (vertex->getLng() - lng_shift) * factor));
         node.setLabel(ss.str());
         vcounter++;
     }
@@ -1402,10 +1429,13 @@ void Graph<T>::viewGraph(bool lat_lng) {
 }
 
 template<class T>
-void Graph<T>::viewGraphIP(const Graph<T> &igraph, bool lat_lng) {
+void Graph<T>::viewGraphIP(const Graph<T> &igraph) {
     // Instantiate GraphViewer
     GraphViewer gv;
     double factor = 1.0;
+    double lat_shift = 0.0;
+    double lng_shift = 0.0;
+    bool lat_lng = latLng;
     if(lat_lng) factor = LATLNG_FACTOR;
 
     // Set coordinates of window center
@@ -1413,8 +1443,19 @@ void Graph<T>::viewGraphIP(const Graph<T> &igraph, bool lat_lng) {
     bool highlight = false;
 
     for (auto vertex : getVertexSet()) {
+        if(lat_lng){
+            lat_shift = vertex->getLat();
+            lng_shift = vertex->getLng();
+            /*
+            if(vertex->getLat() > 0) lat_shift = floor(vertex->getLat());
+            else lat_shift = ceil(vertex->getLat());
+            if(vertex->getLng() > 0) lng_shift = floor(vertex->getLng());
+            else lng_shift = ceil(vertex->getLng());
+             */
+            lat_lng = false;
+        }
         highlight = false;
-        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getLat() * factor, vertex->getLng() * factor));
+        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f((vertex->getLat() - lat_shift) * factor, (vertex->getLng() - lng_shift) * factor));
         for (auto ivertex : igraph.getVertexSet()) {
             if (ivertex->getInfo() == vertex->getInfo()) {
                 highlight = true;
@@ -1469,11 +1510,15 @@ void Graph<T>::viewGraphIP(const Graph<T> &igraph, bool lat_lng) {
 }
 
 template<class T>
-void Graph<T>::viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool lat_lng, bool remove_extra_nodes,
-                             bool remove_extra_edges, bool show_w, bool show_nid) {
+void Graph<T>::viewGraphPath(std::vector<T> path, std::vector<T> interest_points, bool remove_extra_nodes,
+                             bool remove_extra_edges, bool show_w, bool show_nid, bool multiple_vans) {
     // Instantiate GraphViewer
     GraphViewer gv;
+    std::vector<GraphViewer::Color> color_list = {GraphViewer::BLUE, GraphViewer::GREEN, GraphViewer::RED, GraphViewer::CYAN, GraphViewer::MAGENTA, GraphViewer::LIGHT_GRAY, GraphViewer::YELLOW, GraphViewer::ORANGE, GraphViewer::PINK};
     double factor = 1.0;
+    double lat_shift = 0.0;
+    double lng_shift = 0.0;
+    bool lat_lng = latLng;
     if(lat_lng) factor = LATLNG_FACTOR;
     // Set coordinates of window center
     gv.setCenter(sf::Vector2f(300, 300));
@@ -1481,9 +1526,20 @@ void Graph<T>::viewGraphPath(std::vector<T> path, std::vector<T> interest_points
     bool special_highlight = false;
 
     for (auto vertex : getVertexSet()) {
+        if(lat_lng){
+            lat_shift = vertex->getLat();
+            lng_shift = vertex->getLng();
+            /*
+            if(vertex->getLat() > 0) lat_shift = floor(vertex->getLat());
+            else lat_shift = ceil(vertex->getLat());
+            if(vertex->getLng() > 0) lng_shift = floor(vertex->getLng());
+            else lng_shift = ceil(vertex->getLng());
+             */
+            lat_lng = false;
+        }
         highlight = false;
         special_highlight = false;
-        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f(vertex->getLat() * factor, vertex->getLng() * factor));
+        GraphViewer::Node &node = gv.addNode(vertex->getInfo(), sf::Vector2f((vertex->getLat() - lat_shift) * factor, (vertex->getLng() - lng_shift) * factor));
         if (vertex->getInfo() == path[0] || vertex->getInfo() == path[path.size() - 1]) special_highlight = true;
         else {
             for (auto id : interest_points) {
@@ -1517,13 +1573,18 @@ void Graph<T>::viewGraphPath(std::vector<T> path, std::vector<T> interest_points
             GraphViewer::Edge &road = gv.addEdge(counter, gv.getNode(vertex->getInfo()),
                                                  gv.getNode(edge->getDest()->getInfo()), GraphViewer::Edge::DIRECTED);
             for (int i = 0; i < path.size() - 1; i++) {
-                if (edge->getOrigin()->getInfo() == path[i] && edge->getDest()->getInfo() == path[i + 1]) {
+                if (edge->getOrigin()->getInfo() != 0 && edge->getDest()->getInfo() != 0 && edge->getOrigin()->getInfo() == path[i] && edge->getDest()->getInfo() == path[i + 1]) {
                     special_edge = true;
                     break;
                 }
             }
             if (special_edge) {
-                road.setColor(GraphViewer::BLUE);
+                if(multiple_vans){
+                    GraphViewer::Color color;
+                    color = color_list.at(findEdge(road.getFrom()->getId(), road.getTo()->getId())->vanID % color_list.size());
+                    road.setColor(color);
+                }
+                else road.setColor(GraphViewer::BLUE);
                 if (show_w) road.setWeight(edge->cost);
             } else road.setColor(GraphViewer::BLACK);
             //road.setWeight(edge->cost);
@@ -1584,8 +1645,8 @@ void Graph<T>::viewGraphPath(std::vector<T> path, std::vector<T> interest_points
 
 
 template<class T>
-void Graph<T>::viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool lat_lng, bool remove_extra_nodes, bool remove_extra_edges,
-                               bool show_w, bool show_nid) {
+void Graph<T>::viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool remove_extra_nodes, bool remove_extra_edges,
+                               bool show_w, bool show_nid, bool multiple_vans) {
     std::vector<T> interest_points;
     for (auto vertex : igraph.getVertexSet()) {
         interest_points.push_back(vertex->getInfo());
@@ -1599,7 +1660,7 @@ void Graph<T>::viewGraphPathIP(Graph<T> igraph, std::vector<T> path, bool lat_ln
         }
     }
 
-    viewGraphPath(real_path, interest_points, lat_lng, remove_extra_nodes, remove_extra_edges, show_w, show_nid);
+    viewGraphPath(real_path, interest_points, remove_extra_nodes, remove_extra_edges, show_w, show_nid, multiple_vans);
 }
 
 
@@ -1736,7 +1797,6 @@ std::vector<Cluster<T>> Graph<T>::getClusters(const T &origin) {
     std::vector<T> temp;
 
     for (Vertex<T> *v : vertexSet) {
-        std::cout << "GC -> " << v->info << std::endl;
         temp.clear();
         if (v->info != origin) {
             temp.push_back(v->info);
@@ -1745,13 +1805,11 @@ std::vector<Cluster<T>> Graph<T>::getClusters(const T &origin) {
         }
     }
 
-    std::cout << "GC SIZE-> " << cluster_queue.size() << std::endl;
     Cluster<T> main_cluster = Cluster<T>(this, {});
 
     while (!cluster_queue.empty()) {
         temp_clusters.clear();
         main_cluster = cluster_queue.top();
-        std::cout << "GC MC-> ";
         main_cluster.PrintInfo();
         cluster_queue.pop();
         while (!cluster_queue.empty()) {
@@ -1769,6 +1827,55 @@ std::vector<Cluster<T>> Graph<T>::getClusters(const T &origin) {
 
     return result;
 }
+
+/*
+template<class T>
+std::vector<Cluster<T>> Graph<T>::getClustersCapacity(const T &origin, std::vector<int> capacities) {
+    Vertex<T> *orig = findVertex(origin);
+    std::vector<Cluster<T>> result;
+    if (orig == nullptr) {
+        std::cout << "[Clusters] Invalid origin!\n";
+        return result;
+    }
+
+    std::priority_queue<int> capacities_queue;
+    std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareDeparture<T>> cluster_queue;
+    //std::priority_queue<Cluster<T>, std::vector<Cluster<T>>, ClusterCompareDeparture<T>> temp_queue;
+    std::vector<Cluster<T>> temp_clusters;
+    std::vector<T> temp;
+
+    for (Vertex<T> *v : vertexSet) {
+        temp.clear();
+        if (v->info != origin) {
+            temp.push_back(v->info);
+            Cluster<T> cluster(this, temp);
+            cluster_queue.push(cluster);
+        }
+    }
+
+    Cluster<T> main_cluster = Cluster<T>(this, {});
+
+    while (!cluster_queue.empty()) {
+        temp_clusters.clear();
+        main_cluster = cluster_queue.top();
+        main_cluster.PrintInfo();
+        cluster_queue.pop();
+        while (!cluster_queue.empty()) {
+            Cluster<T> other_cluster = cluster_queue.top();
+            if (main_cluster.calculateClusterCost(other_cluster) == 0) {
+                main_cluster.mergeCluster(other_cluster);
+            } else {
+                temp_clusters.push_back(other_cluster);
+            }
+            cluster_queue.pop();
+        }
+        for (Cluster<T> c : temp_clusters) cluster_queue.push(c);
+        result.push_back(main_cluster);
+    }
+
+    return result;
+}
+*/
 
 template<class T>
 class ClusterPairCompare {
@@ -1961,7 +2068,11 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
     }
     unsigned vans_no = vans.size();
 
-    if(vans_no == 0) return std::vector<std::pair<Van, std::vector<Vertex<T> *>>>(Van(-1, 0, 0), {});
+    if(vans_no == 0){
+        std::vector<std::pair<Van, std::vector<Vertex<T> *>>> empty_result;
+        empty_result.push_back(std::pair<Van, std::vector<Vertex<T> *>>(Van(-1, 0, 0), {}));
+        return empty_result;
+    }
     if(vans_no == 1){
         vertices.clear();
         for(Cluster<T> c : clusters){
@@ -1969,7 +2080,10 @@ Graph<T>::dividingClustersGreedy(std::vector<Van> vans, const T &origin) {
                 vertices.push_back(findVertex(info));
             }
         }
-        return std::vector<std::pair<Van, std::vector<Vertex<T> *>>>(vans[0], vertices);
+        std::vector<std::pair<Van, std::vector<Vertex<T> *>>> single_result;
+        single_result.push_back(std::pair<Van, std::vector<Vertex<T> *>>(vans[0], vertices));
+        return single_result;
+        //return std::vector<std::pair<Van, std::vector<Vertex<T> *>>>(vans[0], vertices);
     }
 
     std::vector<Cluster<T>> final_clusters;
@@ -2204,6 +2318,9 @@ void Graph<T>::followVansPath(std::vector<std::pair<Van, std::vector<Vertex<T> *
             if(delay < 0) delay = 0;
             if(delay == 0) std::cout << "[Van Paths] Van " << van_id << "-> Arrived perfectly on time" << ".\n";
             else std::cout << "[Van Paths] Van " << van_id << "-> Arrived " << delay << " minutes late" << ".\n";
+            current_client->visited = true;
+            current_client->visited_at = current_time;
+            road->vanID = van_id;
             current_time += visit_time;
             std::cout << "[Van Paths] Van " << van_id << "-> Delivered to client " << current_client->info << ", leaving at " << current_time << "\n";
         }
@@ -2212,11 +2329,25 @@ void Graph<T>::followVansPath(std::vector<std::pair<Van, std::vector<Vertex<T> *
             std::cout << "[Van Paths] Invalid Connection!\n";
             return;
         }
+        road->vanID = van_id;
         travelling_time = road->cost / velocity;
         current_time += travelling_time;
         std::cout << "[Van Paths] Van " << van_id << "-> Returning to the Origin. Arrived, finally, at " << current_time << "\n";
 
     }
+}
+
+template<class T>
+std::vector<T> Graph<T>::vanPathtoViewPath(std::vector<std::pair<Van, std::vector<Vertex<T > *>>> van_path, const T &og){
+    std::vector<T> result;
+    for(int i = 0; i < van_path.size(); i++){
+        result.push_back(og);
+        for(int j = 0; j < van_path[i].second.size(); j++){
+            result.push_back(van_path[i].second[j]->info);
+        }
+        result.push_back(og);
+    }
+    return result;
 }
 
 #endif /* PROJ_GRAPH_H_ */

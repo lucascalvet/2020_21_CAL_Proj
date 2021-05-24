@@ -44,13 +44,13 @@ void PrintVector(vector<T> vec, string title) {
     }
 }
 
-vector<double> countTimes(Graph<unsigned> ip_graph , unsigned bakery) {
+vector<double> countTimes(Graph<unsigned> ip_graph, unsigned bakery) {
     vector<double> times;
 
     auto start = chrono::high_resolution_clock::now();; // Record start time
     auto finish = chrono::high_resolution_clock::now(); // Record end time
     start = chrono::high_resolution_clock::now();
-    ip_graph.heldKarp(bakery);
+    ip_graph.bruteForceTimes(bakery);
     finish = chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     times.push_back(elapsed.count());
@@ -108,6 +108,7 @@ void importMap(Graph<unsigned> &map) {
     }
     if (choice == 3) lat_lng = true;
     cout << "A importar mapa, pode demorar algum tempo...\n";
+    map = Graph<unsigned>();
     map.importGraph(nodes_filename, edges_filename, lat_lng);
     cout << "Mapa importado com sucesso.\n";
 }
@@ -160,7 +161,7 @@ void calculateRoutes(unsigned bakery, Graph<unsigned> &main_map, Graph<unsigned>
         pair<vector<unsigned>, double> path = ip_map.getPath(bakery, bakery);
         cout << "Distância percorrida: " << path.second << '\n';
         main_map.viewGraphPathIP(ip_map, path.first, true, false, true, true);
-        ip_map.viewGraphPath(path.first, path.first, true, true, true, true);
+        //ip_map.viewGraphPath(path.first, path.first, true, true, true, true);
     }
 }
 
@@ -199,7 +200,7 @@ void mainMenu() {
                     modif = false;
                 }
                 cout << "A abrir GraphViewer...\n";
-                main_map.viewGraph();
+                main_map.viewGraphIP(ip_map);
                 break;
             case 2: // Definir padaria
                 bakery = getUnsigned("Indice da padaria");
@@ -208,7 +209,7 @@ void mainMenu() {
                     bakery = getUnsigned("Indice da padaria");
                 }
                 time = getUnsigned("Velocidade media das carrinhas (km/h)");
-                main_map.setVelocity(time * (1000/60));
+                main_map.setVelocity(time * (1000 / 60));
                 time = getUnsigned("Hora de saida da padaria (min desde as 0:00)");
                 main_map.setEarlyTime(time);
                 time = getUnsigned("Tempo permitido de antecedencia (min)");
@@ -235,8 +236,7 @@ void mainMenu() {
                 if (find(ids.begin(), ids.end(), client) == ids.end()) {
                     ids.push_back(client);
                     cout << "Cliente foi definido.\n";
-                }
-                else {
+                } else {
                     cout << "Cliente foi redefinido.\n";
                 }
                 break;
@@ -337,16 +337,68 @@ int main() {
     // ------------- TIME TESTS ---------------
     Graph<unsigned> main_g;
     cout << "Importing graph...\n";
-    main_g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt", false);
+    main_g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt",
+                       false);
     Graph<unsigned> ip_g;
-    vector<double> hk_times;
+    vector<double> bf_times;
     vector<double> times;
-    vector<unsigned> ip_ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 62};
+    vector<unsigned> ip_ids = {174, 9, 11, 26, 26806, 26809, 26820, 47, 62, 16, 17, 21, 26, 27, 28, 30, 37, 39, 41, 47,
+                               50, 53, 56, 57, 60}; //62, 63, 66, 67, 69, 71, 73, 74, 75, 76, 80, 81, 82, 83, 84, 88, 89};
     vector<unsigned> input_ids;
     main_g.setEarlyTime(5);
     main_g.setStartTime(420);
     main_g.setVelocity(800);
     main_g.setVisitTime(5);
+    /*
+    main_g.findVertex(9)->setTimes(430, 5, 10);
+    main_g.findVertex(26)->setTimes(435, 5, 10);
+    main_g.findVertex(26806)->setTimes(440, 5, 10);
+    main_g.findVertex(26809)->setTimes(445, 5, 15);
+    main_g.findVertex(26820)->setTimes(450, 5, 20);
+    main_g.findVertex(47)->setTimes(455, 5, 10);
+    main_g.findVertex(62)->setTimes(460, 5, 10);
+    main_g.findVertex(11)->setTimes(470, 5, 8);
+    main_g.findVertex(16)->setTimes(475, 5, 10);
+    main_g.findVertex(17)->setTimes(480, 5, 10);
+    main_g.findVertex(21)->setTimes(485, 5, 10);
+    main_g.findVertex(26)->setTimes(490, 5, 10);
+    main_g.findVertex(27)->setTimes(495, 5, 10);
+    main_g.findVertex(28)->setTimes(500, 5, 10);
+    main_g.findVertex(30)->setTimes(505, 5, 10);
+    main_g.findVertex(37)->setTimes(510, 5, 10);
+    main_g.findVertex(39)->setTimes(515, 5, 10);
+    main_g.findVertex(41)->setTimes(520, 5, 10);
+    main_g.findVertex(47)->setTimes(525, 5, 10);
+    main_g.findVertex(50)->setTimes(530, 5, 10);
+    main_g.findVertex(53)->setTimes(535, 5, 10);
+    main_g.findVertex(56)->setTimes(540, 5, 10);
+    main_g.findVertex(57)->setTimes(545, 5, 10);
+    main_g.findVertex(60)->setTimes(450, 5, 10);
+     */
+    main_g.findVertex(9)->setTimes(430, 5, 300);
+    main_g.findVertex(26)->setTimes(430, 5, 300);
+    main_g.findVertex(26806)->setTimes(430, 5, 300);
+    main_g.findVertex(26809)->setTimes(430, 5, 300);
+    main_g.findVertex(26820)->setTimes(430, 5, 300);
+    main_g.findVertex(47)->setTimes(430, 5, 300);
+    main_g.findVertex(62)->setTimes(430, 5, 300);
+    main_g.findVertex(11)->setTimes(430, 5, 300);
+    main_g.findVertex(16)->setTimes(430, 5, 300);
+    main_g.findVertex(17)->setTimes(430, 5, 300);
+    main_g.findVertex(21)->setTimes(430, 5, 300);
+    main_g.findVertex(26)->setTimes(430, 5, 300);
+    main_g.findVertex(27)->setTimes(430, 5, 300);
+    main_g.findVertex(28)->setTimes(430, 5, 300);
+    main_g.findVertex(30)->setTimes(430, 5, 300);
+    main_g.findVertex(37)->setTimes(430, 5, 300);
+    main_g.findVertex(39)->setTimes(430, 5, 300);
+    main_g.findVertex(41)->setTimes(430, 5, 300);
+    main_g.findVertex(47)->setTimes(430, 5, 300);
+    main_g.findVertex(50)->setTimes(430, 5, 300);
+    main_g.findVertex(53)->setTimes(430, 5, 300);
+    main_g.findVertex(56)->setTimes(430, 5, 300);
+    main_g.findVertex(57)->setTimes(430, 5, 300);
+    main_g.findVertex(60)->setTimes(430, 5, 300);
     cout << "Calculating times...\n";
     unsigned counter = 1;
     for (auto id = ip_ids.begin() + 2; id <= ip_ids.end(); id++) {
@@ -354,22 +406,23 @@ int main() {
         ip_g = main_g.generateInterestPointsGraph(input_ids);
         cout << counter << " clientes\n";
         times = countTimes(ip_g, 174);
-        hk_times.push_back(times.at(0));
+        bf_times.push_back(times.at(0));
         counter++;
     }
 
-    string out_file = "hk_times_out.txt";
-    cout << "Writing results to " << out_file << endl;
-    ofstream hk_times_file(out_file);
-    for (auto time : hk_times) {
-        hk_times_file << time << endl;
+    string nn_out_file = "bf_times_out.txt";
+    cout << "Writing results to " << nn_out_file << endl;
+    ofstream nn_times_file(nn_out_file);
+    for (auto time : bf_times) {
+        nn_times_file << time << endl;
     }
 
-    hk_times_file.close();
+    nn_times_file.close();
     cout << "Done!\n";
 
     return 0;
     // ------------- END TIME TESTS ---------------
+
 
     cout << "Start" << endl;
 
@@ -386,7 +439,8 @@ int main() {
 
     cout << "Importing graph..." << endl;
     //g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt", false);
-    g.importGraph("../resources/Porto/porto_strong_nodes_latlng.txt", "../resources/Porto/porto_strong_edges.txt", true);
+    g.importGraph("../resources/Porto/porto_strong_nodes_latlng.txt", "../resources/Porto/porto_strong_edges.txt",
+                  true);
     //gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
     //cout << "Calculating scc..." << endl;
     //cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
@@ -402,7 +456,7 @@ int main() {
     g.findVertex(26806)->setTimes(160, 5, 10);
     g.findVertex(26809)->setTimes(170, 5, 10);
     g.findVertex(26820)->setTimes(490, 5, 10);
-    g.findVertex(47)->setTimes(500, 5, 10);
+    g.findVertex(47)->setTimes(599, 5, 10);
     g.findVertex(62)->setTimes(600, 5, 10);
     vector<unsigned> ids = {9, 11, 26, 26806, 26809, 26820, 47, 62};
     //vector<unsigned> ids {8932, 13373};
@@ -411,36 +465,38 @@ int main() {
     //Graph<unsigned> minig = gg.generateInterestPointsGraph(ids);
     //GraphPrintInfo(g);
 
-    /*
+
     std::vector<Cluster<unsigned>> vc = minig.getClusters(11);
 
-    for(Cluster<unsigned> c : vc){
+    for (Cluster<unsigned> c : vc) {
         c.PrintInfo();
     }
 
     std::vector<Van> vv;
-    vv.push_back(Van(1, 5, 10));
+    vv.push_back(Van(7, 5, 10));
     //vv.push_back(Van(2, 40, 10));
     vv.push_back(Van(3, 2, 10));
-    //vv.push_back(Van(4, 12, 10));
+    vv.push_back(Van(4, 12, 10));
     //vv.push_back(Van(5, 1, 10));
 
     cout << "Dividing Clusters Greedy..." << endl;
 
-    //vector<pair<Van, vector<Vertex<unsigned > *>>> van_pairs = minig.dividingClustersGreedy(vv, 11);
-    vector<pair<Van, vector<Vertex<unsigned > *>>> van_pairs = minig.dividingClustersBrute(vv, 11);
-    for(int i = 0; i < van_pairs.size(); i++){
+    vector<pair<Van, vector<Vertex<unsigned> *>>> van_pairs = minig.dividingClustersGreedy(vv, 11);
+    //vector<pair<Van, vector<Vertex<unsigned > *>>> van_pairs = minig.dividingClustersBrute(vv, 11);
+    for (int i = 0; i < van_pairs.size(); i++) {
         cout << "Van " << van_pairs[i].first.getID() << ": ";
-        for(int j = 0; j < van_pairs[i].second.size(); j++){
+        for (int j = 0; j < van_pairs[i].second.size(); j++) {
             cout << van_pairs[i].second[j]->getInfo() << " ";
         }
         cout << "END" << endl;
     }
 
     minig.followVansPath(van_pairs, 11);
+    vector<unsigned> viewPath = minig.vanPathtoViewPath(van_pairs, 11);
+    minig.viewGraphPath(viewPath, ids, true, true, true, true, true);
 
     return 0;
-     */
+
 
     //GraphPrintInfo(minig);
     //minig.viewGraph();
@@ -458,6 +514,7 @@ int main() {
     //vector<unsigned> ov = minig.getOverlapClients(26806);
     //vector<unsigned> ovt = minig.getOverlapClientsTravelling(26806);
 
+    /*
     cout << "Running Nearest Neighbour Times..." << endl;
     minig.nearestNeighbourTimes(11);
     cout << "Getting path..." << endl;
@@ -504,7 +561,7 @@ int main() {
     //g.viewGraph();
 
     //g.viewGraphPathIP(minig, hk_path.first, true, true);
-
+    /*
     minig.viewGraphPath(hk_path.first, ids, true, true, true, true);
 
     cout << "Running Nearest Neighbour..." << endl;
@@ -524,4 +581,5 @@ int main() {
     //double dist = calculateDistHaversine(41.172792, -8.577122, 41.150174, -8.616987);
     double old_dist = calculateDist(6218.020297963754, -2100.583359242417, 1785.2345472782617, 414.4234916046262);
     cout << "XY DIST: " << old_dist << " vs LATLNG DIST: " << dist << endl;
+     */
 }
