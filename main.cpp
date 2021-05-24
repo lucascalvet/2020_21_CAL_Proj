@@ -383,7 +383,8 @@ int main() {
 
 
     cout << "Importing graph..." << endl;
-    g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt", false);
+    //g.importGraph("../resources/Porto/porto_strong_nodes_xy.txt", "../resources/Porto/porto_strong_edges.txt", false);
+    g.importGraph("../resources/Porto/porto_strong_nodes_latlng.txt", "../resources/Porto/porto_strong_edges.txt", true);
     //gg.importGraph("../resources/Porto/porto_full_nodes_xy.txt", "../resources/Porto/porto_full_edges.txt");
     //cout << "Calculating scc..." << endl;
     //cout << "FULL Detected " << gg.dfsConnectivity().size() << " scc's" << endl;
@@ -408,7 +409,7 @@ int main() {
     //Graph<unsigned> minig = gg.generateInterestPointsGraph(ids);
     //GraphPrintInfo(g);
 
-
+    /*
     std::vector<Cluster<unsigned>> vc = minig.getClusters(11);
 
     for(Cluster<unsigned> c : vc){
@@ -434,9 +435,12 @@ int main() {
         cout << "END" << endl;
     }
 
-    return 0;
+    minig.followVansPath(van_pairs, 11);
 
-    GraphPrintInfo(minig);
+    return 0;
+     */
+
+    //GraphPrintInfo(minig);
     //minig.viewGraph();
 
     /*
@@ -459,7 +463,7 @@ int main() {
 
     minig.printTimes();
     cout << "GraphViewer..." << endl;
-    minig.viewGraphPath(nnt_path.first, ids, true, true, true, true);
+    minig.viewGraphPath(nnt_path.first, ids, true, true, true, true, true);
 
 
     cout << "Running Brute Force Times..." << endl;
@@ -471,7 +475,7 @@ int main() {
         minig.printTimes();
 
         cout << "GraphViewer..." << endl;
-        minig.viewGraphPath(bf_path.first, ids, true, true, true, true);
+        minig.viewGraphPath(bf_path.first, ids, true, true, true, true, true);
     }
 
     return 0;
